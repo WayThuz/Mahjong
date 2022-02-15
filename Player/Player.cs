@@ -1,0 +1,421 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
+
+using UnityEngine;
+using UnityEngine.UI;
+using UnityEngine.Events;
+using UnityEngine.EventSystems;
+
+using MergeSort;
+using CombinationNamespace;
+
+//this is player script, this line is written for test
+//this line is for second test
+public class Player : MonoBehaviour
+{   
+    [SerializeField] private MahjongTable mahjongTable;
+    private PlayerDeckUI myDeckUI;
+    
+    private List<Card> myDeck = new List<Card>();
+    private List<Card> myDeckPlayed = new List<Card>();
+    private Card newCardAwait = null;//拿到的牌
+    private IEnumerator decidedMovementCoroutine;
+    private IEnumerator showMeldCoroutine;
+
+    [SerializeField] private GameObject eatButton;
+    [SerializeField] private GameObject ponButton;
+    [SerializeField] private GameObject kongButton;
+    [SerializeField] private GameObject winButton;
+    [SerializeField] private GameObject quitMovementButton;
+    
+    PointerEventData m_PointerEventData;
+    [SerializeField] GraphicRaycaster m_Raycaster;
+    [SerializeField] EventSystem m_EventSystem;
+       
+    [SerializeField] private int myOrder;
+    [SerializeField] private int selectedCardIndex = -1;
+
+    private List<string> flowersTable = new List<string>();
+    private const int flowerOrder = 400;
+
+    private const int initialStatus = -1;
+    private const int stoppedStatus = -100;
+
+    Regex regexMatchNumber = new Regex(@"[\d]{1,2}");//regex to find number
+    List<Combination> currentCombinations = new List<Combination>();
+
+    bool isGameStart = false;
+    bool isMyCardGiverTurnStart = false;
+    bool isCardGotByDrawing = false;
+    //getCard()
+    void Start(){
+        myDeckUI = transform.Find("PlayerDeck").GetComponent<PlayerDeckUI>();
+    }
+
+    void LateUpdate(){ 
+        if(MahjongSys.current.SystemAllPrepared(ref isGameStart)) gameStart();
+        if(MahjongSys.current.IsCardGiver(myOrder)) turn_CardGiver();
+        else if(MahjongSys.current.IsCardAwaiter(myOrder)) StartCoroutine(turn_CardAwaiter());             
+    }
+
+    #region AllPlayer movement
+    void gameStart(){ 
+        myDeck = MahjongSys.current.DealCards(myOrder); 
+        replaceCards();
+        buttonTakeRest();
+    }
+
+    void turn_CardGiver(){
+        cardGiverStartTurn();                    
+        if(!needToReplaceCards){
+            if(nextMovement == initialStatus && !isMovementChecked) movementCheck(myDeck, newCardAwait);
+            if(Input.GetKeyDown(KeyCode.Mouse0)) pickCard(); 
+        }
+        else replaceCards();             
+    }
+    
+    void cardGiverStartTurn(){ 
+        if(newCardAwait == null && !isMyCardGiverTurnStart){ 
+            isMyCardGiverTurnStart = true;
+            getCard();
+        }     
+    } 
+
+    void getCard(){
+        Card cardGot;
+        isCardGotByDrawing = MahjongSys.current.CardGiverDrawCard(out cardGot);   
+        if(!isCardGotByDrawing){ 
+            mahjongTable.pickCardOnTable();        
+        }
+        else{
+            mahjongTable.drawCardInCenterDeck();
+            newCardAwait = cardGot; 
+        }
+        showMeldCoroutine = showMeldToBroad(cardGot);
+        StartCoroutine(showMeldCoroutine);    
+        resortedAndShowDeck();
+    }
+
+    IEnumerator showMeldToBroad(Card cardGot){
+        bool isMeldAssigned = myDeckUI.isMeldAssigned;
+        if(isMeldAssigned){
+            myDeckUI.showMeldToBroad(ref myDeck, cardGot);
+            yield break;  
+        }
+        else{
+            for(int i = 0; i < 200; i++){
+                yield return new WaitForSeconds(0.1f);
+                if(isMeldAssigned){
+                    myDeckUI.showMeldToBroad(ref myDeck, cardGot);
+                    yield break;  
+                }
+            }
+        }
+    }
+
+    void pickCard(){
+        int indexOfCardClicked = IndexOfCardClicked();
+        if(selectedCardIndex != indexOfCardClicked){
+            selectedCardIndex = indexOfCardClicked;
+        }
+        else if(selectedCardIndex != initialStatus){       
+            Card cardPlayed = CardPlayed(selectedCardIndex); 
+            setCardPlayed(cardPlayed);          
+            if(!isCardGotByDrawing){
+                myDeckUI.removeCardFromDeck(myDeck, selectedCardIndex);
+                myDeckUI.rearrangeDeckspriteName();
+            }
+            else removeAdditionalCardFromDeck(selectedCardIndex);                              
+            newCardAwait = null;
+            selectedCardIndex = -1;
+            CardGiverTurnFinished(cardPlayed);
+        }
+    } 
+
+    void setCardPlayed(Card cardPlayed){
+        if(cardPlayed != null){
+            myDeckPlayed.Add(cardPlayed);
+            mahjongTable.setCardPlayed(cardPlayed, this.transform.position, this.transform.eulerAngles);
+        }
+    }
+
+    void CardGiverTurnFinished(Card cardPlayed){
+        buttonTakeRest();
+        stopAllActions();     
+        resortedAndShowDeck();
+        MahjongSys.current.finishedTurn(myOrder);
+        StartCoroutine(turnEnd(cardPlayed));
+    }
+
+    void stopAllActions(){
+        if(decidedMovementCoroutine != null){
+            StopCoroutine(decidedMovementCoroutine);
+            decidedMovementCoroutine = null;
+        }    
+        if(showMeldCoroutine != null){
+            StopCoroutine(showMeldCoroutine);
+            showMeldCoroutine = null;
+        }
+        isMovementChecked = false;
+    }
+
+    IEnumerator turnEnd(Card cardPlayed){ 
+        StartCoroutine(MahjongSys.current.LoadNextTurn(myOrder, cardPlayed));
+        yield return new WaitForSeconds(0.3f);
+        isMyCardGiverTurnStart = false;
+    } 
+
+    Card CardPlayed(int cardIndex){
+        Card cardPlayed = null;
+        if(cardIndex != -10){ //cardAwait 以外的 card index 都不為-10  
+            cardPlayed = myDeck[cardIndex];               
+        }
+        else if(newCardAwait != null){          
+            cardPlayed = newCardAwait;      
+        }
+        return cardPlayed;
+    }   
+
+    void removeAdditionalCardFromDeck(int cardIndex){
+        if(cardIndex != -10){
+            myDeck.RemoveAt(cardIndex);
+            if(newCardAwait != null){
+                Card newCardJoin = newCardAwait;
+                myDeck.Add(newCardJoin); 
+            }  
+        } 
+    }
+
+    IEnumerator turn_CardAwaiter(){
+        yield return new WaitForSeconds(0.2f);     
+        if(MahjongSys.current.CurrentCardPlayed != null) move_CardOnBroad(MahjongSys.current.CurrentCardPlayed);                            
+        else nextMovement = initialStatus;            
+    }
+
+    void move_CardOnBroad(Card cardOnBroad){   
+        if(nextMovement == initialStatus && !isMovementChecked) movementCheck(myDeck, cardOnBroad);
+        if(nextMovement == stoppedStatus){
+            isMovementChecked = false;
+            MahjongSys.current.finishedTurn(myOrder);
+        }
+        else if(nextMovement != initialStatus) MahjongSys.current.finishedTurn(myOrder);
+    } 
+
+    #endregion
+    
+    #region card replace
+    void replaceCards(){
+        replaceFlowers();
+        myDeckUI.showCardReplaced(flowersTable);
+        resortedAndShowDeck();
+    }
+
+    void replaceFlowers(){
+        for(int i = 0; i < myDeck.Count+1; i++){
+            Card cardReplaced = null;
+            if(i < myDeck.Count && myDeck[i].Order >= flowerOrder){
+                cardReplaced = myDeck[i];
+                myDeck[i] = MahjongSys.current.DrawCardInDeck;
+            }
+            else if(newCardAwait != null && newCardAwait.Order >= flowerOrder){
+                cardReplaced = newCardAwait;
+                newCardAwait = MahjongSys.current.DrawCardInDeck;
+            }           
+            if(cardReplaced == null) continue;
+            myDeckPlayed.Add(cardReplaced);
+            flowersTable.Add(cardReplaced.GetCardName);
+        } 
+    }
+
+    bool needToReplaceCards{         
+        get{
+            foreach(Card card in myDeck){
+                if(card.Order >= flowerOrder) return true;
+            }     
+            if(newCardAwait != null && newCardAwait.Order >= flowerOrder) return true;   
+            return false;
+        }
+    }
+    #endregion
+
+    #region deckCheck, resorted and show deck
+    void resortedAndShowDeck(){
+        resortDeckOrder();
+        myDeckUI.ShowCardName(myDeck, newCardAwait);
+    }
+
+    private int nextMovement = initialStatus;
+    private bool isMovementChecked = false;
+    //0 for only eat, 1 for only pon, 2 for win 
+    void movementCheck(List<Card> deck, Card card){  
+        int eat, pon, kong, win; 
+        eat = pon = kong = win = 0;      
+        isMovementChecked = true;  
+        if(card == null){
+            decidedMovementCoroutine = decidedMovement(eat, pon, kong, win);
+            StartCoroutine(decidedMovementCoroutine);
+        } 
+        else{
+            List<Combination> combine_DeckAndCard = CombinationMethod.CombinationCalculator(deck, card);
+            bool[] checkTable = IsInMelds(combine_DeckAndCard, card);  
+            if(checkTable[2]) kong = 1; 
+            if(isWin(combine_DeckAndCard)) win = 1;
+            if(!MahjongSys.current.IsCardGiver(myOrder)){
+                if(MahjongSys.current.playerCanEat(checkTable[0], myOrder)) eat = 1;
+                if(MahjongSys.current.playerCanPon(checkTable[1], myOrder)) pon = 1;
+            }
+            decidedMovementCoroutine = decidedMovement(eat, pon, kong, win);
+            StartCoroutine(decidedMovementCoroutine);
+        }      
+    }
+    
+    IEnumerator decidedMovement(int eat, int pon, int kong, int win){
+        isMovementChecked = true;
+        movementButtonSetActive(eat, pon, kong, win);      
+        if(eat + pon + kong + win == 0){
+            passThisTurn();
+            yield break;
+        }  
+        for(int i = 0; i < 200; i++){
+            yield return new WaitForSeconds(0.1f);//count
+            if(nextMovement != -1) yield break;    
+        }
+        passThisTurn();
+    }
+    
+    void movementButtonSetActive(int eat, int pon, int kong, int win){
+        if(MahjongSys.current.IsCardGiver(myOrder)){
+            if(kong == 1) kongButton.SetActive(true); if(win == 1) winButton.SetActive(true);
+            if(kong + win > 0) quitMovementButton.SetActive(true);
+        }
+        else{
+            if(eat == 1) eatButton.SetActive(true); if(pon == 1) ponButton.SetActive(true); if(win == 1) winButton.SetActive(true);
+            if(kong == 1) kongButton.SetActive(true); 
+            if(eat + pon + kong + win > 0) quitMovementButton.SetActive(true);
+        }       
+    }
+    
+    void passThisTurn(){
+        nextMovement = -100; // if no decided;
+        MahjongSys.current.setPlayerMovement(myOrder, nextMovement);
+    }
+
+    //0 for eat, 1 for pun, 2 for win, -100 for stop 
+    public void pushMovementButton(int movement){
+        if(decidedMovementCoroutine != null){
+            StopCoroutine(decidedMovementCoroutine);
+            decidedMovementCoroutine = null;
+        }  
+        nextMovement = movement;
+        if(movement != 0) MahjongSys.current.setPlayerMovement(myOrder, nextMovement);
+        nextMovement = stoppedStatus;    
+        if(movement == 0 || movement == 1 || movement == 3){
+            displayMeldHints(movement);        
+            StartCoroutine(meldLifeTimeCountdown()); 
+        }
+        buttonTakeRest();
+    }    
+
+    void displayMeldHints(int movement){ 
+        Card currentCardPlayed = MahjongSys.current.CurrentCardPlayed; 
+        if(currentCardPlayed != null) myDeckUI.AssignMeld(movement, myDeck, currentCardPlayed.Order);   
+        else if(movement == 3){
+            List<int> cardsInKong = CombinationMethod.deckHasKong(myDeck, newCardAwait);
+            myDeckUI.AssignMultipleKongs(myDeck, cardsInKong);
+        } 
+    }
+
+    IEnumerator meldLifeTimeCountdown(){
+        for(int i = 0; i < 10; i++){
+            yield return new WaitForSeconds(0.5f);
+            if(IsNextPlayerDecided()){
+                myDeckUI.DestroyAllHints();       
+                yield break;
+            }
+        }
+        myDeckUI.DestroyAllHints();
+    } 
+
+    bool IsNextPlayerDecided(){
+        if(!MahjongSys.current.IsCardGiver(initialStatus-4)) return true;
+        else return false;
+    }
+    
+    void buttonTakeRest(){
+        eatButton.SetActive(false); ponButton.SetActive(false);
+        kongButton.SetActive(false); winButton.SetActive(false);
+        quitMovementButton.SetActive(false);
+    }
+
+    bool[] IsInMelds(List<Combination> combine_DeckAndCard, Card card){
+        bool[] tableOfMelds = new bool[3]{false,false,false};
+        foreach(Combination combination in combine_DeckAndCard){ 
+            bool[] SequenceOrTriplet = combination.IsInSequenceOrTriplet(card);
+            if(SequenceOrTriplet[0]) tableOfMelds[0] = true;
+            if(SequenceOrTriplet[1]) tableOfMelds[1] = true;          
+        }
+        List<int> cardsInKong = CombinationMethod.deckHasKong(myDeck, card);
+        if(cardsInKong.Contains(card.Order) && !MahjongSys.current.IsCardGiver(myOrder - 1)) tableOfMelds[2] = true;//明槓
+        else if(cardsInKong.Count > 0 && MahjongSys.current.IsCardGiver(myOrder)) tableOfMelds[2] = true;//暗槓
+        return tableOfMelds;
+    }
+
+    bool isWin(List<Combination> combinations){
+        int numberOfWinningCombination = 0;
+        if(MahjongSys.current.WinningCheck(myOrder, combinations, myDeckUI.MeldOnBroadCount, out numberOfWinningCombination)){
+            Debug.Log("Player order: " + myOrder.ToString() + " wins !!! Number of winning combinations: " + numberOfWinningCombination.ToString());
+            return true;
+        }
+        return false;
+    }
+
+    void resortDeckOrder(){
+        List<int> orderList = new List<int>();
+        List<Card> myDeck_new = new List<Card>();
+        foreach (Card card in myDeck){
+            int order = card.Order;
+            orderList.Add(order);          
+        }
+        myMergeSort.MergeSort(ref orderList, 0, myDeck.Count-1);
+        
+        for(int i = 0; i < orderList.Count; i++){
+            for(int j = 0; j < myDeck.Count; j++){
+                if(myDeck[j].Order == orderList[i]){
+                    myDeck_new.Add(myDeck[j]);
+                    myDeck.RemoveAt(j);
+                    break;  
+                }                             
+            }
+        }      
+        myDeck = myDeck_new;
+    }
+    
+    int IndexOfCardClicked(){
+        int indexOfCardClicked = -1;
+        m_PointerEventData = new PointerEventData(m_EventSystem);
+        m_PointerEventData.position = Input.mousePosition;
+        List<RaycastResult> selectedResults = new List<RaycastResult>();
+        m_Raycaster.Raycast(m_PointerEventData, selectedResults);
+        foreach(RaycastResult result in selectedResults){
+            indexOfCardClicked = findSelectCardIndex(result);     
+        }
+        return indexOfCardClicked;
+    }
+
+    int findSelectCardIndex(RaycastResult result){
+        int cardIndex = -1;
+        string name = result.gameObject.name;
+        if(name != "CardAwait"){
+            MatchCollection testResult = regexMatchNumber.Matches(name);
+            foreach(Match i in testResult){
+                int number = int.Parse(i.Value);
+                if(cardIndex == -1) cardIndex = number;
+            }
+        }
+        else cardIndex = -10;
+        return cardIndex;
+    }
+    #endregion
+}
