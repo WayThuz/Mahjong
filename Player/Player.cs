@@ -137,7 +137,7 @@ public class Player : MonoBehaviour
     void setCardPlayed(Card cardPlayed){
         if(cardPlayed != null){
             myDeckPlayed.Add(cardPlayed);
-            mahjongTable.setCardPlayed(cardPlayed, this.transform.position, this.transform.eulerAngles);
+            mahjongTable.setCardPlayed(cardPlayed.Order, this.transform.position, this.transform.eulerAngles);
         }
     }
 

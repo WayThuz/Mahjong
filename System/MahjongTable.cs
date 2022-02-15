@@ -2,8 +2,13 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
-public class MahjongTable : MonoBehaviour
-{
+using Photon.Pun;
+using Photon.Realtime;
+
+public class MahjongTable : MonoBehaviourPunCallbacks
+{   
+    private PhotonView photonview;
+
     [SerializeField] private GameObject cardImage;
     [SerializeField] private GameObject cardModel;
 
@@ -21,6 +26,7 @@ public class MahjongTable : MonoBehaviour
     private const int cardNumber = 144;
     void Awake(){
         tableTransform = this.transform;
+        photonview = GetComponent<PhotonView>();
         setCenterDeckStartPosition(rowLength);
         setRowOffset(lengthBetweenCards);
         createCenterDeck();
@@ -63,26 +69,56 @@ public class MahjongTable : MonoBehaviour
         model.transform.eulerAngles = eulerAngles;
     }
 
-    public void setCardPlayed(Card cardPlayed, Vector3 position, Vector3 eulerAngles){         
-        GameObject cardGameObject = GameObject.Instantiate(cardImage);
+    public void setCardPlayed(int cardPlayedOrder, Vector3 position, Vector3 eulerAngles){         
         Vector3 localPosition = tableTransform.InverseTransformPoint(position);
         Vector2 flatLocalPos = new Vector2(localPosition.x, localPosition.z);
         Vector2 vectorToBorder = TableMethod.VectorToBorder(flatLocalPos, borderLength/2);
         Vector3 randomPos = TableMethod.randomCoordinate(flatLocalPos, vectorToBorder, borderLength/2);
         float randomRotaY = eulerAngles.y + Random.Range(-45, 45);
-        TableMethod.initializeCard(cardGameObject, tableTransform, cardPlayed.Order, randomPos, new Vector3(90,randomRotaY,0));
+        photonview.RPC("visualizedSetCardPlayed", RpcTarget.AllBuffered, cardPlayedOrder, randomPos, randomRotaY);
+    }
+
+    [PunRPC]
+    void visualizedSetCardPlayed(int cardPlayedOrder, Vector3 randomPos, float randomRotaY){
+        GameObject cardGameObject = GameObject.Instantiate(cardImage);
+        TableMethod.initializeCard(cardGameObject, tableTransform, cardPlayedOrder, randomPos, new Vector3(90,randomRotaY,0));
         cardOnTable.Push(cardGameObject);
     }
 
     public void pickCardOnTable(){
+        photonview.RPC("visualizedPickCardOnTable", RpcTarget.AllBuffered);
+    }
+
+    [PunRPC]
+    void visualizedPickCardOnTable(){
         GameObject card = cardOnTable.Pop();
         Destroy(card);
     }
 
     public void drawCardInCenterDeck(){
+        photonview.RPC("visualizedDrawCardInCenterDeck", RpcTarget.AllBuffered);
+    } 
+
+    [PunRPC]
+    void visualizedDrawCardInCenterDeck(){
         GameObject cardModel = centerDeck[0];
         centerDeck.RemoveAt(0);
         cardModel.SetActive(false);
-    }  
+    } 
+
+    public override void OnPlayerEnteredRoom(Photon.Realtime.Player other){
+        if(PhotonNetwork.IsMasterClient){
+            photonview.RPC("asyncCenterDeck", other, centerDeck.Count);
+        }
+    }
+
+    [PunRPC]
+    void asyncCenterDeck(int newCenterDeckCount){
+        int currentCenterDeckOCunt = centerDeck.Count;
+        int difference = currentCenterDeckOCunt - newCenterDeckCount;
+        for(int i = 0; i < difference; i++){
+            centerDeck.RemoveAt(0);
+        }
+    }
 }
 

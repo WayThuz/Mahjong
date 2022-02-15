@@ -11,6 +11,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks
 {   
     public static MahjongSys current;
     private PhotonView photonview;
+    
     private Card[] deck = new Card[144];
     private Card currentCardPlayed = null;
     private Card cardGot = null;
