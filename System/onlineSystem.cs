@@ -12,12 +12,16 @@ public class onlineSystem : MonoBehaviourPunCallbacks
     private static localPlayer myLocalPlayer;
     [SerializeField] private cameraMove CameraMove;
     [SerializeField] private int playerNumbers = 4;
-    void Start()
+    void Awake()
     {
         photonview = GetComponent<PhotonView>();
         if(dataSetter == null) dataSetter =  new DataSetter();
         myLocalPlayer = GameObject.Find("localPlayer").GetComponent<localPlayer>();
-        Debug.Log("Set local player ID");
+        if(PhotonNetwork.IsMasterClient){
+            if(dataSetter.count_IDRemains == playerNumbers){
+                assignPlayerData(PhotonNetwork.MasterClient);
+            }
+        }
     }
 
     public override void OnPlayerEnteredRoom(Photon.Realtime.Player other){
@@ -25,16 +29,13 @@ public class onlineSystem : MonoBehaviourPunCallbacks
         if(PhotonNetwork.IsMasterClient){
             if(dataSetter.count_IDRemains == playerNumbers){
                 assignPlayerData(PhotonNetwork.MasterClient);
-                Debug.Log("Set local player ID");
             }
             assignPlayerData(other);
-            Debug.LogFormat("我是 Master Client 嗎？ {0}", PhotonNetwork.IsMasterClient);
         }
     }
 
     void assignPlayerData(Photon.Realtime.Player other){
         int ID = dataSetter.GetID();
-        Debug.Log("Assign other player with ID: " + ID.ToString());
         photonview.RPC("SetPlayerID", other, ID);
         photonview.RPC("SetLocalCamera", other, ID);
     }

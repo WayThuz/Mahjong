@@ -22,7 +22,6 @@ public class playerData
             PlayerPrefs.SetString(playerNamePrefKey, playerName);
         }
         PlayerPrefs.SetInt(playerIDPrefKey, playerOrder);
-        Debug.Log("Set playerData: " + playerName + " " + playerOrder.ToString());
     }
  
     public string PlayerName{
@@ -55,6 +54,12 @@ public class localPlayer : MonoBehaviour{
         playerOrder = order;
         localPlayerData = new playerData(playerName, playerOrder);
         localPlayerData.SetPlayerData();         
+    }
+
+    public int GetLocalPlayerOrder{
+        get{
+            return localPlayerData.PlayerOrder;
+        }
     }
  
 } 

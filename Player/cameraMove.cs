@@ -20,7 +20,7 @@ public class cameraMove : MonoBehaviour
     }
 
     public void setCameraTransform(int index){
-        Debug.Log("Set camera transform : ID = " + index.ToString());
+        if(mainCamera == null) mainCamera = Camera.main;
         mainCamera.transform.position = cameraPositions[index].position;
         mainCamera.transform.rotation = cameraPositions[index].rotation;
     }

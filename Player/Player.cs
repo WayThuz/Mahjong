@@ -11,13 +11,12 @@ using UnityEngine.EventSystems;
 using MergeSort;
 using CombinationNamespace;
 
-//this is player script, this line is written for test
-//this line is for second test
 public class Player : MonoBehaviour
 {   
     [SerializeField] private MahjongTable mahjongTable;
     private PlayerDeckUI myDeckUI;
-    
+    private localPlayer localplayer;
+
     private List<Card> myDeck = new List<Card>();
     private List<Card> myDeckPlayed = new List<Card>();
     private Card newCardAwait = null;//拿到的牌
@@ -46,18 +45,38 @@ public class Player : MonoBehaviour
     Regex regexMatchNumber = new Regex(@"[\d]{1,2}");//regex to find number
     List<Combination> currentCombinations = new List<Combination>();
 
+    bool isAllComponentSet = false;
     bool isGameStart = false;
     bool isMyCardGiverTurnStart = false;
     bool isCardGotByDrawing = false;
     //getCard()
     void Start(){
         myDeckUI = transform.Find("PlayerDeck").GetComponent<PlayerDeckUI>();
+        StartCoroutine(localPlayerScriptCheck());   
+    }
+
+    IEnumerator localPlayerScriptCheck(){
+        localplayer = GameObject.Find("localPlayer").GetComponent<localPlayer>();
+        yield return new WaitForSeconds(0.2f);
+
+        if(!isThisPlayerScriptBelongsToLocalPlayer){
+            this.enabled = false;
+        }
+        else isAllComponentSet = true;
+    }
+
+    bool isThisPlayerScriptBelongsToLocalPlayer{
+        get{
+            return(localplayer.GetLocalPlayerOrder == myOrder);
+        }
     }
 
     void LateUpdate(){ 
-        if(MahjongSys.current.SystemAllPrepared(ref isGameStart)) gameStart();
-        if(MahjongSys.current.IsCardGiver(myOrder)) turn_CardGiver();
-        else if(MahjongSys.current.IsCardAwaiter(myOrder)) StartCoroutine(turn_CardAwaiter());             
+        if(isAllComponentSet){
+            if(MahjongSys.current.SystemAllPrepared(ref isGameStart)) gameStart();
+            if(MahjongSys.current.IsCardGiver(myOrder)) turn_CardGiver();
+            else if(MahjongSys.current.IsCardAwaiter(myOrder)) StartCoroutine(turn_CardAwaiter());             
+        }
     }
 
     #region AllPlayer movement
@@ -161,11 +180,18 @@ public class Player : MonoBehaviour
         isMovementChecked = false;
     }
 
-    IEnumerator turnEnd(Card cardPlayed){ 
-        StartCoroutine(MahjongSys.current.LoadNextTurn(myOrder, cardPlayed));
+    IEnumerator turnEnd(Card cardPlayed)
+    {
+        LoadNextTurn(cardPlayed.Type, cardPlayed.Number);
         yield return new WaitForSeconds(0.3f);
         isMyCardGiverTurnStart = false;
     } 
+
+   
+    void LoadNextTurn(int cardPlayedType, int cardPlayedNumber)
+    {
+        MahjongSys.current.LoadNextTurn(myOrder, cardPlayedType, cardPlayedNumber);
+    }
 
     Card CardPlayed(int cardIndex){
         Card cardPlayed = null;
