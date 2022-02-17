@@ -12,12 +12,17 @@ public class onlineSystem : MonoBehaviourPunCallbacks
     private static localPlayer myLocalPlayer;
     [SerializeField] private cameraMove CameraMove;
     [SerializeField] private int playerNumbers = 4;
+
+    private delegate void SystemInitializedDelegate();
+    private event SystemInitializedDelegate SystemInitializedEvent;
+    const int numberOfPlayers = 2;
     void Awake()
     {
         photonview = GetComponent<PhotonView>();
         if(dataSetter == null) dataSetter =  new DataSetter();
         myLocalPlayer = GameObject.Find("localPlayer").GetComponent<localPlayer>();
         if(PhotonNetwork.IsMasterClient){
+            SystemInitializedEvent += MahjongSys.current.OnPlayerAllPrepared;
             if(dataSetter.count_IDRemains == playerNumbers){
                 assignPlayerData(PhotonNetwork.MasterClient);
             }
@@ -31,7 +36,16 @@ public class onlineSystem : MonoBehaviourPunCallbacks
                 assignPlayerData(PhotonNetwork.MasterClient);
             }
             assignPlayerData(other);
+
+            if(PlayersAllPrepared){
+                StartCoroutine(GameSystemActivated());
+            }            
         }
+    }
+
+    IEnumerator GameSystemActivated(){
+        yield return new WaitForSeconds(0.5f);
+        SystemInitializedEvent();
     }
 
     void assignPlayerData(Photon.Realtime.Player other){
@@ -49,6 +63,12 @@ public class onlineSystem : MonoBehaviourPunCallbacks
     [PunRPC]
     void SetLocalCamera(int ID){
         CameraMove.setCameraTransform(ID);
+    }
+
+    public bool PlayersAllPrepared{
+        get{
+            return (numberOfPlayers == PhotonNetwork.CurrentRoom.PlayerCount);
+        }
     }
 }
 

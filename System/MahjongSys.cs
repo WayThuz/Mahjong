@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -32,23 +33,19 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     //-1 for initial, 0 for eat, 1 for pon, 2 for win  -100 for stopping
     private int[] playerMovement = new int[numberOfPlayers] { -1, -1, -1, -1 };
     private bool[] turnFinishedCheck = new bool[numberOfPlayers] { false, false, false, false };
+    private bool isCardGotInDeck = false;
+    
 
     void Awake(){
         if (current == null) current = this;
         photonview = GetComponent<PhotonView>();
-        if (PhotonNetwork.IsMasterClient){
-            photonview.RPC("InitializeCenterDeck", PhotonNetwork.LocalPlayer);
-        }
     }
 
-    public override void OnPlayerEnteredRoom(Photon.Realtime.Player other){
-        if (PhotonNetwork.IsMasterClient){
-            assignShuffleDeckToEachClient();
-            photonview.RPC("receivedPlayerDrawCard", other, nextCardIndexBeingDrew);
-        }
+    public void OnPlayerAllPrepared(){
+        InitializeCenterDeck();
+        SystemActivated();
     }
-
-    [PunRPC]
+    
     void InitializeCenterDeck(){
         GenerateCards();
         StartCoroutine(shuffledCards());
@@ -84,8 +81,6 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         NextShuffle();
         yield return new WaitForSeconds(0.5f);
         isShuffled = true;
-        yield return new WaitForSeconds(0.5f);
-        SystemActivated();
     }
 
     void FirstShuffle(){
@@ -94,7 +89,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
             assignList.Add(i);
         }
         for (int i = 0; i < 144; i++){
-            int randomIndex = Random.Range(0, assignList.Count);
+            int randomIndex = UnityEngine.Random.Range(0, assignList.Count);
             shuffledDeck.Add(deck[assignList[randomIndex]]);
             assignList.RemoveAt(randomIndex);
         }
@@ -107,7 +102,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
             assignList.Add(i);
         }
         for (int i = 0; i < 144; i++){
-            int randomIndex = Random.Range(0, assignList.Count);
+            int randomIndex = UnityEngine.Random.Range(0, assignList.Count);
             newShuffledDeck.Add(shuffledDeck[assignList[randomIndex]]);
             assignList.RemoveAt(randomIndex);
         }
@@ -127,19 +122,24 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     }
 
     void SystemActivated(){
-        assignShuffleDeckToEachClient();
-        photonview.RPC("settingsForNextTurn", RpcTarget.AllBuffered, -1, isAllPlayerPass);
-        currentTurnPlayerIndex = 0;
+        if(isShuffled){
+            assignShuffleDeckToOtherClient();
+            photonview.RPC("settingsForNextTurn", RpcTarget.AllBuffered, -1, isAllPlayerPass);
+            currentTurnPlayerIndex = 0;
+        }
+        else{
+            StartCoroutine(waitForCenterDeckShuffled(5.0f, () => SystemActivated()));
+        }
     }
 
-    void assignShuffleDeckToEachClient(){   
+    void assignShuffleDeckToOtherClient(){   
         List<int> types = new List<int>();
         List<int> numbers = new List<int>();
         foreach (Card card in shuffledDeck){
             types.Add(card.Type);
             numbers.Add(card.Number);
         }
-        photonview.RPC("assignDeck", RpcTarget.All, types.ToArray(), numbers.ToArray());
+        photonview.RPC("assignDeck", RpcTarget.OthersBuffered, types.ToArray(), numbers.ToArray());
     }
 
     [PunRPC]
@@ -202,7 +202,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     [PunRPC]
     void settingsForNextTurn(int playerIndex, bool isAllPlayerPass)
     {   
-        if(!isShuffled) StartCoroutine(waitForCenterDeckShuffled(playerIndex, isAllPlayerPass));
+        if(!isShuffled) StartCoroutine(waitForCenterDeckShuffled(2.0f, () => settingsForNextTurn(playerIndex, isAllPlayerPass)));
         else{
             setCardGot(isAllPlayerPass);
             CurrentCardPlayed = null;
@@ -212,17 +212,17 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         }   
     }
 
-    IEnumerator waitForCenterDeckShuffled(int playerIndex, bool isAllPlayerPass){
-        for(int i = 0; i < 20; i++){
-            yield return new WaitForSeconds(0.1f);
+    IEnumerator waitForCenterDeckShuffled(float timeWaiting, Action method){
+        int loopCount = 20;
+        for(int i = 0; i < loopCount; i++){
+            yield return new WaitForSeconds(timeWaiting/loopCount);
             if(isShuffled){
-                settingsForNextTurn(playerIndex, isAllPlayerPass);
+                method();
                 yield break;
             }
         }
     }
 
-    bool isCardGotInDeck = false;
     void setCardGot(bool isAllPlayerPass)
     {   
         if (isAllPlayerPass){   
@@ -334,12 +334,6 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     public bool CardGiverDrawCard(out Card CardGot){
         CardGot = cardGot;
         return isCardGotInDeck;
-    }
-
-    public bool PlayersAllPrepared{
-        get{
-            return (numberOfPlayers == PhotonNetwork.CurrentRoom.PlayerCount);
-        }
     }
 
     public Card DrawCardInDeck{
