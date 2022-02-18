@@ -95,30 +95,15 @@ public class MahjongTable : MonoBehaviourPunCallbacks
         Destroy(card);
     }
 
-    public void drawCardInCenterDeck(){
-        photonview.RPC("visualizedDrawCardInCenterDeck", RpcTarget.AllBuffered);
+    public void playerDrawCardInCenterDeck(){
+        photonview.RPC("visualizedPlayerDrawCardInCenterDeck", RpcTarget.AllBuffered);
     } 
 
     [PunRPC]
-    void visualizedDrawCardInCenterDeck(){
+    void visualizedPlayerDrawCardInCenterDeck(){
         GameObject cardModel = centerDeck[0];
         centerDeck.RemoveAt(0);
         cardModel.SetActive(false);
     } 
-
-    public override void OnPlayerEnteredRoom(Photon.Realtime.Player other){
-        if(PhotonNetwork.IsMasterClient){
-            photonview.RPC("asyncCenterDeck", other, centerDeck.Count);
-        }
-    }
-
-    [PunRPC]
-    void asyncCenterDeck(int newCenterDeckCount){
-        int currentCenterDeckOCunt = centerDeck.Count;
-        int difference = currentCenterDeckOCunt - newCenterDeckCount;
-        for(int i = 0; i < difference; i++){
-            centerDeck.RemoveAt(0);
-        }
-    }
 }
 

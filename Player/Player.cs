@@ -109,7 +109,7 @@ public class Player : MonoBehaviour
             mahjongTable.pickCardOnTable();        
         }
         else{
-            mahjongTable.drawCardInCenterDeck();
+            mahjongTable.playerDrawCardInCenterDeck();
             newCardAwait = cardGot; 
         }
         showMeldCoroutine = showMeldToBroad(cardGot);

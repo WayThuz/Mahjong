@@ -59,4 +59,12 @@ public class TableMethod : MonoBehaviour
         }
         return new Vector2(ratioToBorder, ratioToBorder*slopeOfGradient);
     }
+    
+    public static GameObject setMeldGameObject(Transform meldParent, Vector3 meldPosition, int meldLength, int meldOrder){
+        GameObject meldGameObject = GameObject.Instantiate(Resources.Load("prefab/Meld_" + meldLength.ToString() + "Cards")) as GameObject;
+        meldGameObject.transform.SetParent(meldParent);
+        meldGameObject.transform.localPosition = new Vector3(meldPosition.x + meldOrder * 60, 0, meldPosition.z);
+        meldGameObject.transform.localRotation = Quaternion.Euler(90, 0, 0);
+        return meldGameObject;
+    }
 }

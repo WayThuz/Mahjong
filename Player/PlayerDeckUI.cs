@@ -31,116 +31,73 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
     void Start(){
         canvas = this.gameObject;
         photonview = GetComponent<PhotonView>();
-        SetCardPosition(lengthBetweenNeighbourCards);
+        SetCardOnHandPosition(lengthBetweenNeighbourCards);
     }
 
     public void ShowCardName(List<Card> deck, Card newCardAwait){
-        if (newCardAwait != null)
-        {
-            getCardImage(cardAwaitSprite, newCardAwait.Order.ToString());
-        }
-        else
-        {
-            getCardImage(cardAwaitSprite, "null");
-        }
-        for (int i = 0; i < deck.Count; i++)
-        {
+        if (newCardAwait != null) getCardImage(cardAwaitSprite, newCardAwait.Order.ToString());
+        else getCardImage(cardAwaitSprite, "null");
+        
+        for (int i = 0; i < deck.Count; i++){
             getCardImage(deckSprites[i], deck[i].Order.ToString());
         }
     }
 
     public void showMeldToBroad(ref List<Card> deck, Card cardAwait){
-        bool isTriplet = (meld[0] == meld[1] && meld[1] == meld[2]);
+        bool isSequence = (meld[0] != meld[1]);
         meldOnBroadCount++;
-        if (isTriplet && meld.Length == 3) tripletToBroad(deck, cardAwait);
-        if (isTriplet && meld.Length == 4) kongToBroad(deck, cardAwait);
-        else sequenceToBroad(deck, cardAwait);
+        if(isSequence) sequenceToBroad(deck, cardAwait, meld);
+        else kongOrTripletToBroad(deck, cardAwait, meld);
         rearrangeDeckspriteName();
         meld = null;
     }
 
-    void sequenceToBroad(List<Card> deck, Card cardAwait){
-        int[] cardOrderInMeld = new int[3];
+    void sequenceToBroad(List<Card> deck, Card cardAwait, int[] currentMeld){
+        int[] cardOrderInMeld = currentMeld;
         for (int i = 0; i < meld.Length; i++){
-            if (cardAwait.Order == meld[i]){
-                cardOrderInMeld[i] = cardAwait.Order;
+            if (cardAwait.Order == currentMeld[i]){
                 getCardImage(cardAwaitSprite, null);
                 continue;
             }
             for (int j = deck.Count - 1; j > -1; j--){
-                if (deck[j].Order != meld[i]) continue;
-                cardOrderInMeld[i] = deck[j].Order;
+                if (deck[j].Order != currentMeld[i]) continue;
                 removeCardFromDeck(deck, j);
                 break;
             }
         }
-
         photonview.RPC("putCardToBroad", RpcTarget.AllBuffered, cardOrderInMeld);
     }
 
-    void tripletToBroad(List<Card> deck, Card cardAwait){
-        int[] cardOrderInMeld = new int[3];
-        int count_CardAssigned = 0;
-        if (cardAwait != null)
-        {
-            if (cardAwait.Order == meld[0]){
-                cardOrderInMeld[count_CardAssigned] = cardAwait.Order;
-                getCardImage(cardAwaitSprite, null);
-                count_CardAssigned++;
-            }
-        }
-        for (int j = deck.Count - 1; j > -1; j--){
-            if (deck[j].Order != meld[0]) continue;
-            cardOrderInMeld[count_CardAssigned] = deck[j].Order;
-            removeCardFromDeck(deck, j);
-            count_CardAssigned++;
-            if (count_CardAssigned == meld.Length) break;
-        }
-
-        photonview.RPC("putCardToBroad", RpcTarget.AllBuffered, cardOrderInMeld);
-    }
-
-    void kongToBroad(List<Card> deck, Card cardAwait){
-        int[] cardOrderInMeld = new int[4];
+    void kongOrTripletToBroad(List<Card> deck, Card cardAwait, int[] currentMeld){
+        int[] cardOrderInMeld = currentMeld;
+        int cardOrder = cardOrderInMeld[0];
         int count_CardAssigned = 0;
         if (cardAwait != null){
-            if (cardAwait.Order == meld[0]){
-                cardOrderInMeld[count_CardAssigned] = cardAwait.Order;
+            if (cardAwait.Order == cardOrder){
                 getCardImage(cardAwaitSprite, null);
                 count_CardAssigned++;
             }
         }
         for (int j = deck.Count - 1; j > -1; j--){
-            if (deck[j].Order != meld[0]) continue;
-            cardOrderInMeld[count_CardAssigned] = deck[j].Order;        
+            if (deck[j].Order != cardOrder) continue;
             removeCardFromDeck(deck, j);
             count_CardAssigned++;
             if (count_CardAssigned == meld.Length) break;
         }
-
-        photonview.RPC("putCardToBroad", RpcTarget.AllBuffered, cardOrderInMeld);
+        photonview.RPC("visualizedCardToBroad", RpcTarget.AllBuffered, cardOrderInMeld);
     }
 
-    void putCardToBroad(int[] cardOrderInMeld){
-        GameObject meldGameObject = setMeldGameObject();
+    void visualizedCardToBroad(int[] cardOrderInMeld){
+        GameObject meldGameObject = TableMethod.setMeldGameObject(meldParent, meldPosition, meld.Length, meldOnBroadCount);
         for(int i  = 0; i < cardOrderInMeld.Length; i++){
             Image cardSpriteInMeld = meldGameObject.transform.GetChild(i).GetComponent<Image>();
             getCardImage(cardSpriteInMeld, cardOrderInMeld[i].ToString());
-        }
-       
+        }    
     }
 
     void getCardImage(Image cardImage, string cardID){
         var cardSprite = Resources.Load<Sprite>("deckType/" + cardID);
         if (cardSprite != null) cardImage.sprite = cardSprite;
-    }
-
-    GameObject setMeldGameObject(){
-        GameObject meldGameObject = GameObject.Instantiate(Resources.Load("prefab/Meld_" + meld.Length.ToString() + "Cards")) as GameObject;
-        meldGameObject.transform.SetParent(meldParent);
-        meldGameObject.transform.localPosition = new Vector3(meldPosition.x + meldOnBroadCount * 60, 0, meldPosition.z);
-        meldGameObject.transform.localRotation = Quaternion.Euler(90, 0, 0);
-        return meldGameObject;
     }
 
     public void removeCardFromDeck(List<Card> deck, int cardIndex){
@@ -150,11 +107,11 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
         deckSprites.RemoveAt(cardIndex);
         cardModels.RemoveAt(cardIndex);
         deck.RemoveAt(cardIndex);
-        photonview.RPC("SetCardPosition", RpcTarget.AllBuffered, lengthBetweenNeighbourCards);
+        photonview.RPC("SetCardOnHandPosition", RpcTarget.AllBuffered, lengthBetweenNeighbourCards);
     }
 
     [PunRPC]
-    void SetCardPosition(float length){
+    void SetCardOnHandPosition(float length){
         float centerCardIndex = ((float)cardModels.Count + 1) / 2f;
         for (int i = 0; i < cardModels.Count; i++){
             float posX = lengthBetweenNeighbourCards * (i + 1 - centerCardIndex);
