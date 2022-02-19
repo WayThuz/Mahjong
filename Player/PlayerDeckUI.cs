@@ -88,7 +88,7 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
     }
 
     void visualizedCardToBroad(int[] cardOrderInMeld){
-        GameObject meldGameObject = TableMethod.setMeldGameObject(meldParent, meldPosition, meld.Length, meldOnBroadCount);
+        GameObject meldGameObject = MahjongTable.current.setMeldGameObject(meldParent, meldPosition, meld.Length, meldOnBroadCount);
         for(int i  = 0; i < cardOrderInMeld.Length; i++){
             Image cardSpriteInMeld = meldGameObject.transform.GetChild(i).GetComponent<Image>();
             getCardImage(cardSpriteInMeld, cardOrderInMeld[i].ToString());

@@ -13,7 +13,6 @@ using CombinationNamespace;
 
 public class Player : MonoBehaviour
 {   
-    [SerializeField] private MahjongTable mahjongTable;
     private PlayerDeckUI myDeckUI;
     private localPlayer localplayer;
 
@@ -106,10 +105,10 @@ public class Player : MonoBehaviour
         Card cardGot;
         isCardGotByDrawing = MahjongSys.current.CardGiverDrawCard(out cardGot);   
         if(!isCardGotByDrawing){ 
-            mahjongTable.pickCardOnTable();        
+            MahjongTable.current.pickCardOnTable();        
         }
         else{
-            mahjongTable.playerDrawCardInCenterDeck();
+            MahjongTable.current.playerDrawCardInCenterDeck();
             newCardAwait = cardGot; 
         }
         showMeldCoroutine = showMeldToBroad(cardGot);
@@ -156,7 +155,7 @@ public class Player : MonoBehaviour
     void setCardPlayed(Card cardPlayed){
         if(cardPlayed != null){
             myDeckPlayed.Add(cardPlayed);
-            mahjongTable.setCardPlayed(cardPlayed.Order, this.transform.position, this.transform.eulerAngles);
+            MahjongTable.current.setCardPlayed(cardPlayed.Order, transform.position, transform.eulerAngles);
         }
     }
 

@@ -5,26 +5,38 @@ using UnityEngine.UI;
 using Photon.Pun;
 using Photon.Realtime;
 
+using Method;
+
 public class MahjongTable : MonoBehaviourPunCallbacks
 {   
     private PhotonView photonview;
-
+    public static MahjongTable current;
     [SerializeField] private GameObject cardImage;
     [SerializeField] private GameObject cardModel;
 
     [SerializeField] private float lengthBetweenCards;
     [SerializeField] private float rowLength;
+    [SerializeField] private float heightOfCard = 20;
     [SerializeField] private Vector3 yOffSet;
     private Vector3[] centerDeckStartPosition = new Vector3[4];
     private Vector3[] cardInRowOffset = new Vector3[4];
 
-    [SerializeField] private float borderLength = 100f; 
+    [SerializeField] private float borderLength = 400f; 
     
     private Transform tableTransform;
     private Stack<GameObject> cardOnTable = new Stack<GameObject>(); 
     private List<GameObject> centerDeck = new List<GameObject>();
     private const int cardNumber = 144;
     void Awake(){
+        if(current == null){
+            current = this;
+        }
+        else{
+            if(current != this){
+                current = null;
+                current = this;
+            }
+        }
         tableTransform = this.transform;
         photonview = GetComponent<PhotonView>();
         setCenterDeckStartPosition(rowLength);
@@ -69,11 +81,10 @@ public class MahjongTable : MonoBehaviourPunCallbacks
         model.transform.eulerAngles = eulerAngles;
     }
 
-    public void setCardPlayed(int cardPlayedOrder, Vector3 position, Vector3 eulerAngles){         
-        Vector3 localPosition = tableTransform.InverseTransformPoint(position);
-        Vector2 flatLocalPos = new Vector2(localPosition.x, localPosition.z);
-        Vector2 vectorToBorder = TableMethod.VectorToBorder(flatLocalPos, borderLength/2);
-        Vector3 randomPos = TableMethod.randomCoordinate(flatLocalPos, vectorToBorder, borderLength/2);
+    public void setCardPlayed(int cardPlayedOrder, Vector3 playerPosition, Vector3 eulerAngles){   
+        Vector3 dirVector = playerPosition - this.transform.position;     
+        Vector3 randomPos = TableMethod.randomCoordinate(dirVector, borderLength/2, heightOfCard);
+        Debug.Log(randomPos);
         float randomRotaY = eulerAngles.y + Random.Range(-45, 45);
         photonview.RPC("visualizedSetCardPlayed", RpcTarget.AllBuffered, cardPlayedOrder, randomPos, randomRotaY);
     }
@@ -105,5 +116,10 @@ public class MahjongTable : MonoBehaviourPunCallbacks
         centerDeck.RemoveAt(0);
         cardModel.SetActive(false);
     } 
+
+    public GameObject setMeldGameObject(Transform meldParent, Vector3 meldPosition, int meldLength, int meldOrder){
+        GameObject meldGameObject = TableMethod.setMeldGameObject(meldParent, meldPosition, meldLength, meldOrder);
+        return meldGameObject;
+    }
 }
 
