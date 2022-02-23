@@ -28,7 +28,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     const int numberOfPlayers = 4;
     const int number_TotalDeals = 4;
     const int cards_EachDeal = 4;
-    const int testNumberOfPlayers = 2;
+    const int testNumberOfPlayers = 4;
 
     //-1 for initial, 0 for eat, 1 for pon, 2 for win  -100 for stopping
     private int[] playerMovement = new int[numberOfPlayers] { -1, -1, -1, -1 };
