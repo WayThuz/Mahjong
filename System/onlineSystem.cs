@@ -11,11 +11,10 @@ public class onlineSystem : MonoBehaviourPunCallbacks
     private static DataSetter dataSetter;
     private static localPlayer myLocalPlayer;
     [SerializeField] private cameraMove CameraMove;
-    [SerializeField] private int playerNumbers = 4;
+    private const int playerNumbers = 4;
 
     private delegate void SystemInitializedDelegate();
     private event SystemInitializedDelegate SystemInitializedEvent;
-    const int numberOfPlayers = 2;
     void Awake()
     {
         photonview = GetComponent<PhotonView>();
@@ -67,7 +66,7 @@ public class onlineSystem : MonoBehaviourPunCallbacks
 
     public bool PlayersAllPrepared{
         get{
-            return (numberOfPlayers == PhotonNetwork.CurrentRoom.PlayerCount);
+            return (playerNumbers == PhotonNetwork.CurrentRoom.PlayerCount);
         }
     }
 }

@@ -3,6 +3,8 @@ using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.SceneManagement;
+
 using Photon.Pun;
 using Photon.Realtime;
 
@@ -11,7 +13,7 @@ using CombinationNamespace;
 public class MahjongSys : MonoBehaviourPunCallbacks{
     public static MahjongSys current;
     private PhotonView photonview;
-
+    [SerializeField] private GameObject[] playerObjs = new GameObject[4];
     private Card[] deck = new Card[144];
     private Card currentCardPlayed = null;
     private Card cardGot = null;
@@ -20,7 +22,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
 
     private bool isShuffled = false;
     private bool isAllPlayerPass = true;
-    private int cardPlayerIndex = -1;
+    private int cardPlayerIndex = 0;
     private int nextCardIndexBeingDrew = 63;
     private int currentTurnPlayerIndex = -1;
     private int localPlayerOrder = -1;
@@ -28,7 +30,6 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     const int numberOfPlayers = 4;
     const int number_TotalDeals = 4;
     const int cards_EachDeal = 4;
-    const int testNumberOfPlayers = 4;
 
     //-1 for initial, 0 for eat, 1 for pon, 2 for win  -100 for stopping
     private int[] playerMovement = new int[numberOfPlayers] { -1, -1, -1, -1 };
@@ -42,8 +43,20 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     }
 
     public void OnPlayerAllPrepared(){
+        PlayerAwake();
         InitializeCenterDeck();
         SystemActivated();
+    }
+
+    void PlayerAwake(){
+        photonview.RPC("playerGameObjectEnabled", RpcTarget.AllBuffered);
+    }
+
+    [PunRPC]
+    void playerGameObjectEnabled(){
+        foreach(GameObject player in playerObjs){
+            player.SetActive(true);
+        }
     }
     
     void InitializeCenterDeck(){
@@ -155,11 +168,12 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     }
 
     public void LoadNextTurn(int previousPlayer, int cardPlayedType, int cardPlayedNumber){
-        setCurrentCardPlayed(cardPlayedType, cardPlayedNumber);
+        photonview.RPC("setCurrentCardPlayed", RpcTarget.AllBuffered, cardPlayedType, cardPlayedNumber);
         if(PhotonNetwork.IsMasterClient) MasterSysLoadNextTurn(previousPlayer);
         else photonview.RPC("MasterSysLoadNextTurn", RpcTarget.MasterClient, previousPlayer);
     }
-    
+
+    [PunRPC]
     void setCurrentCardPlayed(int cardPlayedType, int cardPlayedNumber) {
         Card cardPlayed = new Card(cardPlayedType, cardPlayedNumber);
         CurrentCardPlayed = cardPlayed;
@@ -294,6 +308,15 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         if (playerOrder < numberOfPlayers) playerMovement[playerOrder] = nextMovement;
     }
 
+    public void PlayerWins(){
+        photonview.RPC("loadWinningScene", RpcTarget.AllBuffered);
+    }
+
+    [PunRPC]
+    void loadWinningScene(){
+        SceneManager.LoadScene(2);
+    }
+
     public bool WinningCheck(int playerOrder, List<Combination> combinationList, int meldOnBroadCount, out int numberOfWinningCombination){
         numberOfWinningCombination = 0;
         bool winningCheck = false;
@@ -338,7 +361,6 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
 
     public Card DrawCardInDeck{
         get{
-            Debug.Log(nextCardIndexBeingDrew);
             nextCardIndexBeingDrew++;
             photonview.RPC("receivedPlayerDrawCard", RpcTarget.MasterClient, nextCardIndexBeingDrew);
             return shuffledDeck[nextCardIndexBeingDrew];

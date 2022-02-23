@@ -49,7 +49,7 @@ public class Player : MonoBehaviour
     bool isMyCardGiverTurnStart = false;
     bool isCardGotByDrawing = false;
     //getCard()
-    void Start(){
+    void OnEnable(){
         myDeckUI = transform.Find("PlayerDeck").GetComponent<PlayerDeckUI>();
         StartCoroutine(localPlayerScriptCheck());   
     }
@@ -214,6 +214,7 @@ public class Player : MonoBehaviour
     }
 
     IEnumerator turn_CardAwaiter(){
+        Debug.Log("I am awaiter");
         yield return new WaitForSeconds(0.2f);     
         if(MahjongSys.current.CurrentCardPlayed != null) move_CardOnBroad(MahjongSys.current.CurrentCardPlayed);                            
         else nextMovement = initialStatus;            
@@ -279,6 +280,7 @@ public class Player : MonoBehaviour
         eat = pon = kong = win = 0;      
         isMovementChecked = true;  
         if(card == null){
+            Debug.Log("card == null");
             decidedMovementCoroutine = decidedMovement(eat, pon, kong, win);
             StartCoroutine(decidedMovementCoroutine);
         } 
@@ -297,6 +299,7 @@ public class Player : MonoBehaviour
     }
     
     IEnumerator decidedMovement(int eat, int pon, int kong, int win){
+        Debug.Log((eat, pon, kong, win));
         isMovementChecked = true;
         movementButtonSetActive(eat, pon, kong, win);      
         if(eat + pon + kong + win == 0){
@@ -340,6 +343,7 @@ public class Player : MonoBehaviour
             displayMeldHints(movement);        
             StartCoroutine(meldLifeTimeCountdown()); 
         }
+        else if(movement == 2) MahjongSys.current.PlayerWins();
         buttonTakeRest();
     }    
 
