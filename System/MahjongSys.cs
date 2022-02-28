@@ -21,7 +21,6 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     private IEnumerator decidedNextPlayerCoroutine;
 
     private bool isShuffled = false;
-    private bool isAllPlayerPass = true;
     private int cardPlayerIndex = 0;
     private int nextCardIndexBeingDrew = 63;
     private int currentTurnPlayerIndex = -1;
@@ -137,7 +136,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     void SystemActivated(){
         if(isShuffled){
             assignShuffleDeckToOtherClient();
-            photonview.RPC("settingsForNextTurn", RpcTarget.AllBuffered, -1, isAllPlayerPass);
+            photonview.RPC("settingsForNextTurn", RpcTarget.AllBuffered, -1, true);
             currentTurnPlayerIndex = 0;
         }
         else{
@@ -188,6 +187,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
 
     IEnumerator decidedNextPlayer(int previousPlayer){
         int nextPlayer = -1;
+        int winnerPlayer = -1;
         if (previousPlayer == -1){
             nextPlayer = 0;
             yield return StartCoroutine(turnPreparation(nextPlayer));
@@ -197,8 +197,19 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         for (int i = 0; i < 21; i++){
             yield return new WaitForSeconds(1f);
             if (!allFinished) continue;
+            winnerPlayer = getWinner(previousPlayer);
+            if(winnerPlayer != -1){
+                PlayerWins(winnerPlayer);
+                yield break;
+            }
             nextPlayer = getNextPlayer(previousPlayer);
             yield return StartCoroutine(turnPreparation(nextPlayer));
+            yield break;
+        }
+
+        winnerPlayer = getWinner(previousPlayer);
+        if(winnerPlayer != -1){
+            PlayerWins(winnerPlayer);
             yield break;
         }
         nextPlayer = getNextPlayer(previousPlayer);
@@ -207,15 +218,13 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
 
     IEnumerator turnPreparation(int playerIndex){
         StopCoroutine(decidedNextPlayerCoroutine);
-        if (playerMovement[playerIndex] < 0) isAllPlayerPass = true;
-        else isAllPlayerPass = false;
+        bool isAllPlayerPass = (playerMovement[playerIndex] < 0);
         yield return new WaitForSeconds(0.5f);
         photonview.RPC("settingsForNextTurn", RpcTarget.AllBuffered, playerIndex, isAllPlayerPass);
     }
 
     [PunRPC]
-    void settingsForNextTurn(int playerIndex, bool isAllPlayerPass)
-    {   
+    void settingsForNextTurn(int playerIndex, bool isAllPlayerPass){   
         if(!isShuffled) StartCoroutine(waitForCenterDeckShuffled(2.0f, () => settingsForNextTurn(playerIndex, isAllPlayerPass)));
         else{
             setCardGot(isAllPlayerPass);
@@ -237,8 +246,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         }
     }
 
-    void setCardGot(bool isAllPlayerPass)
-    {   
+    void setCardGot(bool isAllPlayerPass){   
         if (isAllPlayerPass){   
             cardGot = DrawCardInDeck;
             isCardGotInDeck = true;
@@ -259,6 +267,18 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         for (int i = 0; i < numberOfPlayers; i++){
             turnFinishedCheck[i] = false;
         }
+    }
+
+    int getWinner(int previousPlayer){
+        int winnerPlayer = -1;
+        for(int i  = 0; i < 4; i++){
+            int playerOrder = (previousPlayer + i)%4;
+            if(playerMovement[playerOrder] == 2){
+                winnerPlayer = playerOrder;
+                return winnerPlayer;
+            }
+        }
+        return winnerPlayer;
     }
 
     int getNextPlayer(int previousPlayer){
@@ -308,12 +328,13 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         if (playerOrder < numberOfPlayers) playerMovement[playerOrder] = nextMovement;
     }
 
-    public void PlayerWins(){
-        photonview.RPC("loadWinningScene", RpcTarget.AllBuffered);
+    void PlayerWins(int winnerOrder){
+       photonview.RPC("loadWinningScene", RpcTarget.AllBuffered, winnerOrder);
     }
 
     [PunRPC]
-    void loadWinningScene(){
+    void loadWinningScene(int winnerOrder){
+        PlayerPrefs.SetInt("winnerPlayerIndex", winnerOrder);
         SceneManager.LoadScene(2);
     }
 

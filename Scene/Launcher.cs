@@ -15,7 +15,7 @@ public class Launcher : MonoBehaviourPunCallbacks
         Screen.SetResolution(640, 480, false);
     }
     
-    public void Connect(){
+    void Connect(){
         isConnecting = true;
         if(PhotonNetwork.IsConnected){
             PhotonNetwork.JoinRandomRoom();
@@ -50,5 +50,9 @@ public class Launcher : MonoBehaviourPunCallbacks
             Debug.Log("我是第一個進來的");
             PhotonNetwork.LoadLevel(1);
         }
+    }
+
+    void OnTriggerEnter(Collider other){
+        Connect();
     }
 }

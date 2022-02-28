@@ -16,20 +16,24 @@ public class onlineSystem : MonoBehaviourPunCallbacks
     private delegate void SystemInitializedDelegate();
     private event SystemInitializedDelegate SystemInitializedEvent;
     void Awake()
-    {
+    {   
+        DontDestroyOnLoad(this.gameObject);
         photonview = GetComponent<PhotonView>();
-        if(dataSetter == null) dataSetter =  new DataSetter();
         myLocalPlayer = GameObject.Find("localPlayer").GetComponent<localPlayer>();
+        if(dataSetter == null) dataSetter =  new DataSetter();
         if(PhotonNetwork.IsMasterClient){
-            SystemInitializedEvent += MahjongSys.current.OnPlayerAllPrepared;
-            if(dataSetter.count_IDRemains == playerNumbers){
-                assignPlayerData(PhotonNetwork.MasterClient);
-            }
+            InitMasterOnlineSystem();
+        }
+    }
+
+    void InitMasterOnlineSystem(){
+        SystemInitializedEvent += MahjongSys.current.OnPlayerAllPrepared;
+        if(dataSetter.count_IDRemains == playerNumbers){
+            assignPlayerData(PhotonNetwork.MasterClient);
         }
     }
 
     public override void OnPlayerEnteredRoom(Photon.Realtime.Player other){
-        Debug.LogFormat("{0} 進入遊戲室", other.NickName);
         if(PhotonNetwork.IsMasterClient){
             if(dataSetter.count_IDRemains == playerNumbers){
                 assignPlayerData(PhotonNetwork.MasterClient);

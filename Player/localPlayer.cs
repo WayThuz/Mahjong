@@ -61,5 +61,11 @@ public class localPlayer : MonoBehaviour{
             return localPlayerData.PlayerOrder;
         }
     }
+
+    public string GetLocalPlayerName{
+        get{
+            return localPlayerData.PlayerName;
+        }
+    }
  
 } 

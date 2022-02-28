@@ -46,7 +46,7 @@ public class Player : MonoBehaviour
 
     bool isAllComponentSet = false;
     bool isGameStart = false;
-    bool isMyCardGiverTurnStart = false;
+    bool isCardGiver = false;
     bool isCardGotByDrawing = false;
     //getCard()
     void OnEnable(){
@@ -74,7 +74,7 @@ public class Player : MonoBehaviour
         if(isAllComponentSet){
             if(MahjongSys.current.SystemAllPrepared(ref isGameStart)) gameStart();
             if(MahjongSys.current.IsCardGiver(myOrder)) turn_CardGiver();
-            else if(MahjongSys.current.IsCardAwaiter(myOrder)) StartCoroutine(turn_CardAwaiter());             
+            else if(MahjongSys.current.IsCardAwaiter(myOrder)) turn_CardAwaiter();             
         }
     }
 
@@ -95,8 +95,8 @@ public class Player : MonoBehaviour
     }
     
     void cardGiverStartTurn(){ 
-        if(newCardAwait == null && !isMyCardGiverTurnStart){ 
-            isMyCardGiverTurnStart = true;
+        if(newCardAwait == null && !isCardGiver){ 
+            isCardGiver = true;
             getCard();
         }     
     } 
@@ -183,7 +183,7 @@ public class Player : MonoBehaviour
     {
         LoadNextTurn(cardPlayed.Type, cardPlayed.Number);
         yield return new WaitForSeconds(0.3f);
-        isMyCardGiverTurnStart = false;
+        isCardGiver = false;
     } 
 
    
@@ -213,9 +213,7 @@ public class Player : MonoBehaviour
         } 
     }
 
-    IEnumerator turn_CardAwaiter(){
-        Debug.Log("I am awaiter");
-        yield return new WaitForSeconds(0.2f);     
+    void turn_CardAwaiter(){   
         if(MahjongSys.current.CurrentCardPlayed != null) move_CardOnBroad(MahjongSys.current.CurrentCardPlayed);                            
         else nextMovement = initialStatus;            
     }
@@ -319,8 +317,8 @@ public class Player : MonoBehaviour
             if(kong + win > 0) quitMovementButton.SetActive(true);
         }
         else{
-            if(eat == 1) eatButton.SetActive(true); if(pon == 1) ponButton.SetActive(true); if(win == 1) winButton.SetActive(true);
-            if(kong == 1) kongButton.SetActive(true); 
+            if(eat == 1) eatButton.SetActive(true); if(pon == 1) ponButton.SetActive(true); 
+            if(win == 1) winButton.SetActive(true); if(kong == 1) kongButton.SetActive(true); 
             if(eat + pon + kong + win > 0) quitMovementButton.SetActive(true);
         }       
     }
@@ -340,14 +338,13 @@ public class Player : MonoBehaviour
         if(movement != 0) MahjongSys.current.setPlayerMovement(myOrder, nextMovement);
         nextMovement = stoppedStatus;    
         if(movement == 0 || movement == 1 || movement == 3){
-            displayMeldHints(movement);        
+            displayMeld(movement);        
             StartCoroutine(meldLifeTimeCountdown()); 
         }
-        else if(movement == 2) MahjongSys.current.PlayerWins();
         buttonTakeRest();
     }    
 
-    void displayMeldHints(int movement){ 
+    void displayMeld(int movement){ 
         Card currentCardPlayed = MahjongSys.current.CurrentCardPlayed; 
         if(currentCardPlayed != null) myDeckUI.AssignMeld(movement, myDeck, currentCardPlayed.Order);   
         else if(movement == 3){
