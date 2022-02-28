@@ -84,7 +84,6 @@ public class MahjongTable : MonoBehaviourPunCallbacks
     public void setCardPlayed(int cardPlayedOrder, Vector3 playerPosition, Vector3 eulerAngles){   
         Vector3 dirVector = playerPosition - this.transform.position;     
         Vector3 randomPos = TableMethod.randomCoordinate(dirVector, borderLength/2, heightOfCard);
-        Debug.Log(randomPos);
         float randomRotaY = eulerAngles.y + Random.Range(-45, 45);
         photonview.RPC("visualizedSetCardPlayed", RpcTarget.AllBuffered, cardPlayedOrder, randomPos, randomRotaY);
     }

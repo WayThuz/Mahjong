@@ -35,7 +35,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     private bool[] turnFinishedCheck = new bool[numberOfPlayers] { false, false, false, false };
     private bool isCardGotInDeck = false;
     
-
+#region MethodSystemWouldCall
     void Awake(){
         if (current == null) current = this;
         photonview = GetComponent<PhotonView>();
@@ -47,17 +47,19 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         SystemActivated();
     }
 
+    #region PlayerAwake
     void PlayerAwake(){
         photonview.RPC("playerGameObjectEnabled", RpcTarget.AllBuffered);
-    }
-
+    }    
     [PunRPC]
     void playerGameObjectEnabled(){
         foreach(GameObject player in playerObjs){
             player.SetActive(true);
         }
     }
+    #endregion
     
+    #region Initialized
     void InitializeCenterDeck(){
         GenerateCards();
         StartCoroutine(shuffledCards());
@@ -120,19 +122,9 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         }
         shuffledDeck = newShuffledDeck;
     }
+    #endregion
 
-    public List<Card> DealCards(int playerOrder){
-        List<Card> myDeck = new List<Card>();
-        for (int i = 0; i < number_TotalDeals; i++){
-            int cardOnTop = playerOrder * cards_EachDeal + i * 16;
-            myDeck.Add(shuffledDeck[cardOnTop]);
-            myDeck.Add(shuffledDeck[cardOnTop + 1]);
-            myDeck.Add(shuffledDeck[cardOnTop + 2]);
-            myDeck.Add(shuffledDeck[cardOnTop + 3]);
-        }
-        return myDeck;
-    }
-
+    #region SystemActivated
     void SystemActivated(){
         if(isShuffled){
             assignShuffleDeckToOtherClient();
@@ -143,7 +135,6 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
             StartCoroutine(waitForCenterDeckShuffled(5.0f, () => SystemActivated()));
         }
     }
-
     void assignShuffleDeckToOtherClient(){   
         List<int> types = new List<int>();
         List<int> numbers = new List<int>();
@@ -156,7 +147,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
 
     [PunRPC]
     void assignDeck(int[] types, int[] numbers){
-        if (!isShuffled){
+        if(!isShuffled){
             this.shuffledDeck = new List<Card>();
             for (int i = 0; i < types.Length; i++){
                 Card card = new Card(types[i], numbers[i]);
@@ -165,7 +156,9 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
             isShuffled = true;
         }
     }
+    #endregion  
 
+    #region LoadTurn
     public void LoadNextTurn(int previousPlayer, int cardPlayedType, int cardPlayedNumber){
         photonview.RPC("setCurrentCardPlayed", RpcTarget.AllBuffered, cardPlayedType, cardPlayedNumber);
         if(PhotonNetwork.IsMasterClient) MasterSysLoadNextTurn(previousPlayer);
@@ -186,86 +179,30 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     }
 
     IEnumerator decidedNextPlayer(int previousPlayer){
-        int nextPlayer = -1;
-        int winnerPlayer = -1;
-        if (previousPlayer == -1){
-            nextPlayer = 0;
-            yield return StartCoroutine(turnPreparation(nextPlayer));
-            yield break;
-        }
-
         for (int i = 0; i < 21; i++){
             yield return new WaitForSeconds(1f);
-            if (!allFinished) continue;
-            winnerPlayer = getWinner(previousPlayer);
-            if(winnerPlayer != -1){
-                PlayerWins(winnerPlayer);
+            if (allFinished()){
+                getPlayerWithCheckMovement(previousPlayer);
                 yield break;
             }
-            nextPlayer = getNextPlayer(previousPlayer);
-            yield return StartCoroutine(turnPreparation(nextPlayer));
-            yield break;
-        }
-
-        winnerPlayer = getWinner(previousPlayer);
-        if(winnerPlayer != -1){
-            PlayerWins(winnerPlayer);
-            yield break;
-        }
-        nextPlayer = getNextPlayer(previousPlayer);
-        yield return StartCoroutine(turnPreparation(nextPlayer));
+        } 
+        getPlayerWithCheckMovement(previousPlayer);
     }
 
-    IEnumerator turnPreparation(int playerIndex){
-        StopCoroutine(decidedNextPlayerCoroutine);
-        bool isAllPlayerPass = (playerMovement[playerIndex] < 0);
-        yield return new WaitForSeconds(0.5f);
-        photonview.RPC("settingsForNextTurn", RpcTarget.AllBuffered, playerIndex, isAllPlayerPass);
+    bool allFinished(){
+        bool isMoved = true;
+        foreach (int movement in playerMovement){
+            if (movement == -1) isMoved = false;
+        }
+        return (isMoved && turnFinishedCheck[0] && turnFinishedCheck[1] && turnFinishedCheck[2] && turnFinishedCheck[3]);
     }
 
-    [PunRPC]
-    void settingsForNextTurn(int playerIndex, bool isAllPlayerPass){   
-        if(!isShuffled) StartCoroutine(waitForCenterDeckShuffled(2.0f, () => settingsForNextTurn(playerIndex, isAllPlayerPass)));
+    void getPlayerWithCheckMovement(int previousPlayer){
+        int winnerPlayer = getWinner(previousPlayer);
+        if(winnerPlayer != -1) PlayerWins(winnerPlayer);
         else{
-            setCardGot(isAllPlayerPass);
-            CurrentCardPlayed = null;
-            resetMovement();
-            resetFinishedCheck();
-            currentTurnPlayerIndex = playerIndex; 
-        }   
-    }
-
-    IEnumerator waitForCenterDeckShuffled(float timeWaiting, Action method){
-        int loopCount = 20;
-        for(int i = 0; i < loopCount; i++){
-            yield return new WaitForSeconds(timeWaiting/loopCount);
-            if(isShuffled){
-                method();
-                yield break;
-            }
-        }
-    }
-
-    void setCardGot(bool isAllPlayerPass){   
-        if (isAllPlayerPass){   
-            cardGot = DrawCardInDeck;
-            isCardGotInDeck = true;
-        }
-        else{
-            cardGot = currentCardPlayed;
-            isCardGotInDeck = false;
-        }
-    }
-
-    void resetMovement(){
-        for (int i = 0; i < numberOfPlayers; i++){
-            setPlayerMovement(i, -1);
-        }
-    }
-
-    void resetFinishedCheck(){
-        for (int i = 0; i < numberOfPlayers; i++){
-            turnFinishedCheck[i] = false;
+            int nextPlayer = getNextPlayer(previousPlayer);
+            StartCoroutine(turnPreparation(nextPlayer));
         }
     }
 
@@ -299,7 +236,113 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         return playerIndex;
     }
 
+    void PlayerWins(int winnerOrder){
+       photonview.RPC("loadWinningScene", RpcTarget.AllBuffered, winnerOrder);
+    }
 
+    [PunRPC]
+    void loadWinningScene(int winnerOrder){
+        PlayerPrefs.SetInt("winnerPlayerIndex", winnerOrder);
+        SceneManager.LoadScene(2);
+    }
+
+    IEnumerator turnPreparation(int playerIndex){
+        StopCoroutine(decidedNextPlayerCoroutine);
+        bool isAllPlayerPass = (playerMovement[playerIndex] < 0);
+        yield return new WaitForSeconds(0.5f);
+        photonview.RPC("settingsForNextTurn", RpcTarget.AllBuffered, playerIndex, isAllPlayerPass);
+    }
+    #endregion
+
+    #region SettingsForNextTurn
+    [PunRPC]
+    void settingsForNextTurn(int playerIndex, bool isAllPlayerPass){   
+        if(!isShuffled) StartCoroutine(waitForCenterDeckShuffled(2.0f, () => settingsForNextTurn(playerIndex, isAllPlayerPass)));
+        else{
+            setCardGot(isAllPlayerPass);
+            CurrentCardPlayed = null;
+            resetMovement();
+            resetFinishedCheck();
+            if(playerIndex != -1) currentTurnPlayerIndex = playerIndex; 
+        }   
+    }
+
+    void setCardGot(bool isAllPlayerPass){   
+        if (isAllPlayerPass){   
+            cardGot = DrawCardInDeck;
+            isCardGotInDeck = true;
+        }
+        else{
+            cardGot = currentCardPlayed;
+            isCardGotInDeck = false;
+        }
+    }
+
+    void resetMovement(){
+        for (int i = 0; i < numberOfPlayers; i++){
+            setPlayerMovement(i, -1);
+        }
+    }
+
+    void resetFinishedCheck(){
+        for (int i = 0; i < numberOfPlayers; i++){
+            turnFinishedCheck[i] = false;
+        }
+    }
+    #endregion
+
+    #region Others
+    IEnumerator waitForCenterDeckShuffled(float timeWaiting, Action method){
+        int loopCount = 20;
+        for(int i = 0; i < loopCount; i++){
+            yield return new WaitForSeconds(timeWaiting/loopCount);
+            if(isShuffled){
+                method();
+                yield break;
+            }
+        }
+    }
+
+    int[] eachTypeCount = new int[5] { 8, 10, 10, 10, 9 };
+    public void showWholeDeck(List<Card> deck){
+        List<int> deckType = new List<int>();
+        int[] amountEachType = new int[42];
+        for (int i = 0; i < 42; i++){
+            amountEachType[i] = 0;
+        }
+
+        for (int i = 0; i < 5; i++){
+            for (int j = 1; j < eachTypeCount[i]; j++) { deckType.Add(i * 100 + j); }
+        }
+
+        foreach (Card card in deck){
+            int order = card.Order;
+            for (int i = 0; i < deckType.Count; i++){
+                if (deckType[i] == order) amountEachType[i]++;
+            }
+        }
+
+        for (int i = 0; i < 42; i++){
+            Debug.Log("id: " + i.ToString() + " amounts: " + amountEachType[i].ToString());
+        }
+    }
+    #endregion
+#endregion
+
+#region MethodPlayerWouldCall
+    public List<Card> DealCards(int playerOrder){
+        List<Card> myDeck = new List<Card>();
+        for (int i = 0; i < number_TotalDeals; i++){
+            int cardOnTop = playerOrder * cards_EachDeal + i * 16;
+            myDeck.Add(shuffledDeck[cardOnTop]);
+            myDeck.Add(shuffledDeck[cardOnTop + 1]);
+            myDeck.Add(shuffledDeck[cardOnTop + 2]);
+            myDeck.Add(shuffledDeck[cardOnTop + 3]);
+        }
+        return myDeck;
+    }
+
+    #region PlayerFinishTurn
     public void finishedTurn(int playerOrder){
         photonview.RPC("receivedPlayerFinishedTurn", RpcTarget.AllBuffered, playerOrder);
     }
@@ -318,6 +361,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     void cardAwaiterFinishedTurn(int playerOrder){
         if (!turnFinishedCheck[playerOrder]) turnFinishedCheck[playerOrder] = true;
     }
+    #endregion
 
     public void setPlayerMovement(int playerOrder, int nextMovement){
         photonview.RPC("receivedPlayerSetMovement", RpcTarget.AllBuffered, playerOrder, nextMovement);
@@ -326,16 +370,6 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     [PunRPC]
     void receivedPlayerSetMovement(int playerOrder, int nextMovement){
         if (playerOrder < numberOfPlayers) playerMovement[playerOrder] = nextMovement;
-    }
-
-    void PlayerWins(int winnerOrder){
-       photonview.RPC("loadWinningScene", RpcTarget.AllBuffered, winnerOrder);
-    }
-
-    [PunRPC]
-    void loadWinningScene(int winnerOrder){
-        PlayerPrefs.SetInt("winnerPlayerIndex", winnerOrder);
-        SceneManager.LoadScene(2);
     }
 
     public bool WinningCheck(int playerOrder, List<Combination> combinationList, int meldOnBroadCount, out int numberOfWinningCombination){
@@ -411,37 +445,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         }
     }
 
-    bool allFinished{
-        get{
-            bool isMoved = true;
-            foreach (int movement in playerMovement){
-                if (movement == -1) isMoved = false;
-            }
-            return (isMoved && turnFinishedCheck[0] && turnFinishedCheck[1] && turnFinishedCheck[2] && turnFinishedCheck[3]);
-        }
-    }
+#endregion
 
-    int[] eachTypeCount = new int[5] { 8, 10, 10, 10, 9 };
-    public void showWholeDeck(List<Card> deck){
-        List<int> deckType = new List<int>();
-        int[] amountEachType = new int[42];
-        for (int i = 0; i < 42; i++){
-            amountEachType[i] = 0;
-        }
-
-        for (int i = 0; i < 5; i++){
-            for (int j = 1; j < eachTypeCount[i]; j++) { deckType.Add(i * 100 + j); }
-        }
-
-        foreach (Card card in deck){
-            int order = card.Order;
-            for (int i = 0; i < deckType.Count; i++){
-                if (deckType[i] == order) amountEachType[i]++;
-            }
-        }
-
-        for (int i = 0; i < 42; i++){
-            Debug.Log("id: " + i.ToString() + " amounts: " + amountEachType[i].ToString());
-        }
-    }
+    
 }
