@@ -15,6 +15,7 @@ public class Player : MonoBehaviour
 {   
     private PlayerDeckUI myDeckUI;
     private localPlayer localplayer;
+    private cameraMove myCameraMove;
 
     private List<Card> myDeck = new List<Card>();
     private List<Card> myDeckPlayed = new List<Card>();
@@ -51,6 +52,7 @@ public class Player : MonoBehaviour
     //getCard()
     void OnEnable(){
         myDeckUI = transform.Find("PlayerDeck").GetComponent<PlayerDeckUI>();
+        myCameraMove = GameObject.Find("CameraController").GetComponent<cameraMove>();
         StartCoroutine(localPlayerScriptCheck());   
     }
 
@@ -61,7 +63,10 @@ public class Player : MonoBehaviour
         if(!isThisPlayerScriptBelongsToLocalPlayer){
             this.enabled = false;
         }
-        else isAllComponentSet = true;
+        else{
+            isAllComponentSet = true;
+            myCameraMove.setPlayerPositionToCamera(this.transform);
+        }
     }
 
     bool isThisPlayerScriptBelongsToLocalPlayer{
@@ -141,13 +146,7 @@ public class Player : MonoBehaviour
         else if(selectedCardIndex != initialStatus){       
             Card cardPlayed = CardPlayed(selectedCardIndex); 
             setCardPlayed(cardPlayed);          
-            if(!isCardGotByDrawing){
-                myDeckUI.removeCardFromDeck(myDeck, selectedCardIndex);
-                myDeckUI.rearrangeDeckspriteName();
-            }
-            else removeAdditionalCardFromDeck(selectedCardIndex);                              
-            newCardAwait = null;
-            selectedCardIndex = -1;
+            removeCardPlayedFromDeck();
             CardGiverTurnFinished(cardPlayed);
         }
     } 
@@ -159,10 +158,33 @@ public class Player : MonoBehaviour
         }
     }
 
+    void removeCardPlayedFromDeck(){
+        if(!isCardGotByDrawing) extractCardPlayed();
+        else replaceCardPlayed(selectedCardIndex);                              
+        selectedCardIndex = -1;
+        resortedAndShowDeck();
+    }
+
+    void extractCardPlayed(){
+        myDeckUI.extractCard(myDeck, selectedCardIndex);
+        myDeckUI.rearrangeDeckspriteName();
+    }
+
+    void replaceCardPlayed(int cardIndex){
+        if(cardIndex != -10){
+            myDeck.RemoveAt(cardIndex);
+            if(newCardAwait != null){
+                Card newCardJoin = newCardAwait;
+                myDeck.Add(newCardJoin); 
+                newCardAwait = null;
+            }  
+        } 
+        else newCardAwait = null;
+    }
+
     void CardGiverTurnFinished(Card cardPlayed){
         buttonTakeRest();
         stopAllActions();     
-        resortedAndShowDeck();
         MahjongSys.current.finishedTurn(myOrder);
         StartCoroutine(turnEnd(cardPlayed));
     }
@@ -179,16 +201,14 @@ public class Player : MonoBehaviour
         isMovementChecked = false;
     }
 
-    IEnumerator turnEnd(Card cardPlayed)
-    {
+    IEnumerator turnEnd(Card cardPlayed){
         LoadNextTurn(cardPlayed.Type, cardPlayed.Number);
         yield return new WaitForSeconds(0.3f);
         isCardGiver = false;
     } 
 
    
-    void LoadNextTurn(int cardPlayedType, int cardPlayedNumber)
-    {
+    void LoadNextTurn(int cardPlayedType, int cardPlayedNumber){
         MahjongSys.current.LoadNextTurn(myOrder, cardPlayedType, cardPlayedNumber);
     }
 
@@ -202,16 +222,6 @@ public class Player : MonoBehaviour
         }
         return cardPlayed;
     }   
-
-    void removeAdditionalCardFromDeck(int cardIndex){
-        if(cardIndex != -10){
-            myDeck.RemoveAt(cardIndex);
-            if(newCardAwait != null){
-                Card newCardJoin = newCardAwait;
-                myDeck.Add(newCardJoin); 
-            }  
-        } 
-    }
 
     void turn_CardAwaiter(){   
         if(MahjongSys.current.CurrentCardPlayed != null) move_CardOnBroad(MahjongSys.current.CurrentCardPlayed);                            
@@ -297,7 +307,6 @@ public class Player : MonoBehaviour
     }
     
     IEnumerator decidedMovement(int eat, int pon, int kong, int win){
-        Debug.Log((eat, pon, kong, win));
         isMovementChecked = true;
         movementButtonSetActive(eat, pon, kong, win);      
         if(eat + pon + kong + win == 0){

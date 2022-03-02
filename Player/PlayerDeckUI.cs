@@ -61,7 +61,7 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
             }
             for (int j = deck.Count - 1; j > -1; j--){
                 if (deck[j].Order != currentMeld[i]) continue;
-                removeCardFromDeck(deck, j);
+                extractCard(deck, j);
                 break;
             }
         }
@@ -80,7 +80,7 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
         }
         for (int j = deck.Count - 1; j > -1; j--){
             if (deck[j].Order != cardOrder) continue;
-            removeCardFromDeck(deck, j);
+            extractCard(deck, j);
             count_CardAssigned++;
             if (count_CardAssigned == meld.Length) break;
         }
@@ -100,7 +100,7 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
         if (cardSprite != null) cardImage.sprite = cardSprite;
     }
 
-    public void removeCardFromDeck(List<Card> deck, int cardIndex){
+    public void extractCard(List<Card> deck, int cardIndex){
         deckSprites[cardIndex].name = "null";
         deckSprites[cardIndex].gameObject.SetActive(false);
         cardModels[cardIndex].gameObject.SetActive(false);

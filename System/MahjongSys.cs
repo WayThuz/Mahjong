@@ -160,6 +160,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
 
     #region LoadTurn
     public void LoadNextTurn(int previousPlayer, int cardPlayedType, int cardPlayedNumber){
+        
         photonview.RPC("setCurrentCardPlayed", RpcTarget.AllBuffered, cardPlayedType, cardPlayedNumber);
         if(PhotonNetwork.IsMasterClient) MasterSysLoadNextTurn(previousPlayer);
         else photonview.RPC("MasterSysLoadNextTurn", RpcTarget.MasterClient, previousPlayer);
