@@ -100,7 +100,8 @@ public class Player : MonoBehaviour
     }
     
     void cardGiverStartTurn(){ 
-        if(newCardAwait == null && !isCardGiver){ 
+        if(newCardAwait == null && !isCardGiver){
+            nextMovement = initialStatus;
             isCardGiver = true;
             getCard();
         }     
@@ -114,6 +115,7 @@ public class Player : MonoBehaviour
         }
         else{
             MahjongTable.current.playerDrawCardInCenterDeck();
+            myDeckUI.setMeld = null;
             newCardAwait = cardGot; 
         }
         showMeldCoroutine = showMeldToBroad(cardGot);
@@ -159,15 +161,10 @@ public class Player : MonoBehaviour
     }
 
     void removeCardPlayedFromDeck(){
-        if(!isCardGotByDrawing) extractCardPlayed();
+        if(!isCardGotByDrawing) myDeckUI.extractCard(myDeck, selectedCardIndex);
         else replaceCardPlayed(selectedCardIndex);                              
         selectedCardIndex = -1;
         resortedAndShowDeck();
-    }
-
-    void extractCardPlayed(){
-        myDeckUI.extractCard(myDeck, selectedCardIndex);
-        myDeckUI.rearrangeDeckspriteName();
     }
 
     void replaceCardPlayed(int cardIndex){
@@ -184,8 +181,9 @@ public class Player : MonoBehaviour
 
     void CardGiverTurnFinished(Card cardPlayed){
         buttonTakeRest();
-        stopAllActions();     
-        MahjongSys.current.finishedTurn(myOrder);
+        stopAllActions();  
+        if(nextMovement == initialStatus) passThisTurn();   
+        MahjongSys.current.finishedTurn(myOrder, true);
         StartCoroutine(turnEnd(cardPlayed));
     }
 
@@ -199,6 +197,7 @@ public class Player : MonoBehaviour
             showMeldCoroutine = null;
         }
         isMovementChecked = false;
+        if(newCardAwait != null) newCardAwait = null;
     }
 
     IEnumerator turnEnd(Card cardPlayed){
@@ -232,9 +231,9 @@ public class Player : MonoBehaviour
         if(nextMovement == initialStatus && !isMovementChecked) movementCheck(myDeck, cardOnBroad);
         if(nextMovement == stoppedStatus){
             isMovementChecked = false;
-            MahjongSys.current.finishedTurn(myOrder);
+            MahjongSys.current.finishedTurn(myOrder, false);
         }
-        else if(nextMovement != initialStatus) MahjongSys.current.finishedTurn(myOrder);
+        else if(nextMovement != initialStatus) MahjongSys.current.finishedTurn(myOrder, false);
     } 
 
     #endregion
@@ -315,7 +314,7 @@ public class Player : MonoBehaviour
         }  
         for(int i = 0; i < 200; i++){
             yield return new WaitForSeconds(0.1f);//count
-            if(nextMovement != -1) yield break;    
+            if(nextMovement != initialStatus) yield break;    
         }
         passThisTurn();
     }
@@ -350,6 +349,8 @@ public class Player : MonoBehaviour
             displayMeld(movement);        
             StartCoroutine(meldLifeTimeCountdown()); 
         }
+        else if(MahjongSys.current.IsCardGiver(myOrder) && movement == 2) MahjongSys.current.PlayerWins(myOrder);//自摸
+
         buttonTakeRest();
     }    
 

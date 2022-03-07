@@ -101,16 +101,21 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
     }
 
     public void extractCard(List<Card> deck, int cardIndex){
+        deck.RemoveAt(cardIndex);
+        photonview.RPC("ClientExtractCard", RpcTarget.AllBuffered, cardIndex);
+    }
+
+    [PunRPC]
+    void ClientExtractCard(int cardIndex){
         deckSprites[cardIndex].name = "null";
         deckSprites[cardIndex].gameObject.SetActive(false);
         cardModels[cardIndex].gameObject.SetActive(false);
         deckSprites.RemoveAt(cardIndex);
         cardModels.RemoveAt(cardIndex);
-        deck.RemoveAt(cardIndex);
-        photonview.RPC("SetCardOnHandPosition", RpcTarget.AllBuffered, lengthBetweenNeighbourCards);
+        rearrangeDeckspriteName();
+        SetCardOnHandPosition(lengthBetweenNeighbourCards);
     }
 
-    [PunRPC]
     void SetCardOnHandPosition(float length){
         float centerCardIndex = ((float)cardModels.Count + 1) / 2f;
         for (int i = 0; i < cardModels.Count; i++){
@@ -120,7 +125,7 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
         }
     }
 
-    public void rearrangeDeckspriteName(){
+    void rearrangeDeckspriteName(){
         for (int k = 0; k < deckSprites.Count; k++){
             deckSprites[k].name = "Card(" + k.ToString() + ")";
         }
