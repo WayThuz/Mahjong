@@ -336,22 +336,12 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     }
 
     #region PlayerFinishTurn
-    public void finishedTurn(int playerOrder, bool isCardGiver){
-        photonview.RPC("receivedPlayerFinishedTurn", RpcTarget.AllBuffered, playerOrder, isCardGiver);
+    public void finishedTurn(int playerOrder){
+        photonview.RPC("receivedPlayerFinishedTurn", RpcTarget.AllBuffered, playerOrder);
     }
 
     [PunRPC]
-    void receivedPlayerFinishedTurn(int playerOrder,bool isCardGiver){
-        if (isCardGiver) cardGiverFinishedTurn(playerOrder);
-        else cardAwaiterFinishedTurn(playerOrder);
-    }
-
-    void cardGiverFinishedTurn(int playerOrder){
-        if (!turnFinishedCheck[playerOrder]) turnFinishedCheck[playerOrder] = true;
-        currentTurnGiverIndex = playerOrder;
-    }
-
-    void cardAwaiterFinishedTurn(int playerOrder){
+    void receivedPlayerFinishedTurn(int playerOrder){
         if (!turnFinishedCheck[playerOrder]) turnFinishedCheck[playerOrder] = true;
     }
     #endregion

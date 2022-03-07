@@ -183,7 +183,7 @@ public class Player : MonoBehaviour
         buttonTakeRest();
         stopAllActions();  
         if(nextMovement == initialStatus) passThisTurn();   
-        MahjongSys.current.finishedTurn(myOrder, true);
+        MahjongSys.current.finishedTurn(myOrder);
         StartCoroutine(turnEnd(cardPlayed));
     }
 
@@ -231,9 +231,9 @@ public class Player : MonoBehaviour
         if(nextMovement == initialStatus && !isMovementChecked) movementCheck(myDeck, cardOnBroad);
         if(nextMovement == stoppedStatus){
             isMovementChecked = false;
-            MahjongSys.current.finishedTurn(myOrder, false);
+            MahjongSys.current.finishedTurn(myOrder);
         }
-        else if(nextMovement != initialStatus) MahjongSys.current.finishedTurn(myOrder, false);
+        else if(nextMovement != initialStatus) MahjongSys.current.finishedTurn(myOrder);
     } 
 
     #endregion
