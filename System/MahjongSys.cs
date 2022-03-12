@@ -355,6 +355,19 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         if (playerOrder < numberOfPlayers) playerMovement[playerOrder] = nextMovement;
     }
 
+    public bool HasMovementPriorThanMine(int playerOrder, int movement){
+        if(movement == -100){
+            throw new ArgumentException("movement = -100, which is the value should not call this function");
+        }
+        for(int i = 0; i < playerMovement.Length; i++){
+            if(i == playerOrder) continue;
+            if(playerMovement[i] > movement || playerMovement[i] == 2){
+                return false;
+            }
+        }
+        return true;
+    }
+
     public bool WinningCheck(int playerOrder, List<Combination> combinationList, int meldOnBroadCount, out int numberOfWinningCombination){
         numberOfWinningCombination = 0;
         bool winningCheck = false;

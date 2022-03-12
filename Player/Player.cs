@@ -94,7 +94,7 @@ public class Player : MonoBehaviour
         cardGiverStartTurn();                    
         if(!needToReplaceCards){
             if(nextMovement == initialStatus && !isMovementChecked) movementCheck(myDeck, newCardAwait);
-            if(Input.GetKeyDown(KeyCode.Mouse0)) pickCard(); 
+            if(Input.GetKeyDown(KeyCode.Mouse0)) pickAndPlayCard(); 
         }
         else replaceCards();             
     }
@@ -116,6 +116,7 @@ public class Player : MonoBehaviour
         else{
             MahjongTable.current.playerDrawCardInCenterDeck();
             myDeckUI.setMeld = null;
+            myDeckUI.changeCardAwaitStatus(true);
             newCardAwait = cardGot; 
         }
         showMeldCoroutine = showMeldToBroad(cardGot);
@@ -140,7 +141,7 @@ public class Player : MonoBehaviour
         }
     }
 
-    void pickCard(){
+    void pickAndPlayCard(){
         int indexOfCardClicked = IndexOfCardClicked();
         if(selectedCardIndex != indexOfCardClicked){
             selectedCardIndex = indexOfCardClicked;
@@ -149,6 +150,7 @@ public class Player : MonoBehaviour
             Card cardPlayed = CardPlayed(selectedCardIndex); 
             setCardPlayed(cardPlayed);          
             removeCardPlayedFromDeck();
+            myDeckUI.changeCardAwaitStatus(false);
             CardGiverTurnFinished(cardPlayed);
         }
     } 
@@ -231,7 +233,7 @@ public class Player : MonoBehaviour
         if(nextMovement == initialStatus && !isMovementChecked) movementCheck(myDeck, cardOnBroad);
         if(nextMovement == stoppedStatus){
             isMovementChecked = false;
-            MahjongSys.current.finishedTurn(myOrder);
+            MahjongSys.current.finishedTurn(myOrder);//the movement might still waiting for decision
         }
         else if(nextMovement != initialStatus) MahjongSys.current.finishedTurn(myOrder);
     } 
@@ -276,7 +278,7 @@ public class Player : MonoBehaviour
     #region deckCheck, resorted and show deck
     void resortedAndShowDeck(){
         resortDeckOrder();
-        myDeckUI.ShowCardName(myDeck, newCardAwait);
+        myDeckUI.cardImageUpdate(myDeck, newCardAwait);
     }
 
     private int nextMovement = initialStatus;
@@ -287,7 +289,6 @@ public class Player : MonoBehaviour
         eat = pon = kong = win = 0;      
         isMovementChecked = true;  
         if(card == null){
-            Debug.Log("card == null");
             decidedMovementCoroutine = decidedMovement(eat, pon, kong, win);
             StartCoroutine(decidedMovementCoroutine);
         } 
@@ -343,11 +344,11 @@ public class Player : MonoBehaviour
             decidedMovementCoroutine = null;
         }  
         nextMovement = movement;
-        if(movement != 0) MahjongSys.current.setPlayerMovement(myOrder, nextMovement);
+        MahjongSys.current.setPlayerMovement(myOrder, nextMovement);
         nextMovement = stoppedStatus;    
         if(movement == 0 || movement == 1 || movement == 3){
             displayMeld(movement);        
-            StartCoroutine(meldLifeTimeCountdown()); 
+            StartCoroutine(meldHintLifeTimeCountdown(movement)); 
         }
         else if(MahjongSys.current.IsCardGiver(myOrder) && movement == 2) MahjongSys.current.PlayerWins(myOrder);//自摸
 
@@ -363,21 +364,13 @@ public class Player : MonoBehaviour
         } 
     }
 
-    IEnumerator meldLifeTimeCountdown(){
-        for(int i = 0; i < 10; i++){
-            yield return new WaitForSeconds(0.5f);
-            if(IsNextPlayerDecided()){
-                myDeckUI.DestroyAllHints();       
-                yield break;
-            }
+    IEnumerator meldHintLifeTimeCountdown(int movement){
+        for(int i = 0; i < 100; i++){
+            yield return new WaitForSeconds(0.05f);
+            if(MahjongSys.current.HasMovementPriorThanMine(myOrder, movement)) myDeckUI.DestroyAllHints();
         }
         myDeckUI.DestroyAllHints();
     } 
-
-    bool IsNextPlayerDecided(){
-        if(!MahjongSys.current.IsCardGiver(initialStatus-4)) return true;
-        else return false;
-    }
     
     void buttonTakeRest(){
         eatButton.SetActive(false); ponButton.SetActive(false);

@@ -26,8 +26,6 @@ public class Launcher : MonoBehaviourPunCallbacks
             PhotonNetwork.ConnectUsingSettings();//建立連線
             Debug.Log("isConnected = false");
         }
-
-        
     }
 
     public override void OnConnectedToMaster(){

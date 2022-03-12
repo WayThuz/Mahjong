@@ -9,6 +9,7 @@ using CombinationNamespace;
 public class PlayerDeckUI : MonoBehaviourPunCallbacks{
     private PhotonView photonview;
     [SerializeField] private Image cardAwaitSprite;
+    [SerializeField] private GameObject  cardAwaitModel;
     [SerializeField] private List<GameObject> cardModels = new List<GameObject>();
     [SerializeField] private List<Image> deckSprites = new List<Image>();
     [SerializeField] private Text flowersText;
@@ -20,7 +21,6 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
     [SerializeField] private Vector3 meldPosition = new Vector3(-240, -100, 50);
     [SerializeField] private Vector2 sizeDelta;
 
-    [SerializeField] private int myOrder;
     private int meldOnBroadCount = 0;
     private GameObject canvas;
     List<meldHint> allMeldHints = new List<meldHint>();
@@ -34,29 +34,36 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
         SetCardOnHandPosition(lengthBetweenNeighbourCards);
     }
 
-    public void ShowCardName(List<Card> deck, Card newCardAwait){
-        if (newCardAwait != null) getCardImage(cardAwaitSprite, newCardAwait.Order.ToString());
-        else getCardImage(cardAwaitSprite, "null");
+    public void cardImageUpdate(List<Card> deck, Card newCardAwait){
+        if(isCardGotByDrawing){
+            if (newCardAwait != null) getCardImage(cardAwaitSprite, newCardAwait.Order.ToString());
+            else getCardImage(cardAwaitSprite, "null");
+        }
         
         for (int i = 0; i < deck.Count; i++){
             getCardImage(deckSprites[i], deck[i].Order.ToString());
         }
     }
 
-    public void showMeldToBroad(ref List<Card> deck, Card cardAwait){
+    public void changeCardAwaitStatus(bool status){
+        cardAwaitModel.SetActive(status);
+        cardAwaitSprite.enabled = status;
+    }
+
+    public void showMeldToBroad(ref List<Card> deck, Card cardGot){
         bool isSequence = (meld[0] != meld[1]);
         meldOnBroadCount++;
-        if(isSequence) sequenceToBroad(deck, cardAwait, meld);
-        else kongOrTripletToBroad(deck, cardAwait, meld);
+        if(isSequence) sequenceToBroad(deck, cardGot, meld);
+        else kongOrTripletToBroad(deck, cardGot, meld);
         rearrangeDeckspriteName();
         meld = null;
     }
 
-    void sequenceToBroad(List<Card> deck, Card cardAwait, int[] currentMeld){
+    void sequenceToBroad(List<Card> deck, Card cardGot, int[] currentMeld){
         int[] cardOrderInMeld = currentMeld;
         for (int i = 0; i < meld.Length; i++){
-            if (cardAwait.Order == currentMeld[i]){
-                getCardImage(cardAwaitSprite, null);
+            if (cardGot.Order == currentMeld[i]){
+                if(isCardGotByDrawing) getCardImage(cardAwaitSprite, null);
                 continue;
             }
             for (int j = deck.Count - 1; j > -1; j--){
@@ -68,13 +75,13 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
         photonview.RPC("putCardToBroad", RpcTarget.AllBuffered, cardOrderInMeld);
     }
 
-    void kongOrTripletToBroad(List<Card> deck, Card cardAwait, int[] currentMeld){
+    void kongOrTripletToBroad(List<Card> deck, Card cardGot, int[] currentMeld){
         int[] cardOrderInMeld = currentMeld;
         int cardOrder = cardOrderInMeld[0];
         int count_CardAssigned = 0;
-        if (cardAwait != null){
-            if (cardAwait.Order == cardOrder){
-                getCardImage(cardAwaitSprite, null);
+        if(cardGot != null){
+            if(cardGot.Order == cardOrder){
+                if(isCardGotByDrawing) getCardImage(cardAwaitSprite, null);
                 count_CardAssigned++;
             }
         }
@@ -219,12 +226,6 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
         }
     }
 
-    public int MyOrder{
-        get{
-            return myOrder;
-        }
-    }
-
     public int MeldOnBroadCount{
         get{
             return meldOnBroadCount;
@@ -234,6 +235,12 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
     public bool isMeldAssigned{
         get{
             return (meld != null);
+        }
+    }
+
+    bool isCardGotByDrawing{
+        get{
+            return(cardAwaitModel.activeInHierarchy);
         }
     }
 

@@ -47,12 +47,6 @@ public class meldHint
         }
     }
 
-    public void setPlayerMovement(){
-        int order = parentGameObject.GetComponent<PlayerDeckUI>().MyOrder;
-        bool isKong = (cardsInMeld.Length == 4);
-        if(!isKong) MahjongSys.current.setPlayerMovement(order, 0);
-    }
-
     Sprite findSpriteInResouces(string path, string cardImageName){
         Sprite cardSprite = Resources.Load<Sprite>(path + cardImageName);
         return cardSprite;
@@ -97,7 +91,6 @@ public class meldHint
     void setButtonListener(Button button){
         button.onClick.AddListener(setMeld);
         button.onClick.AddListener(DestroyAllHints);
-        button.onClick.AddListener(setPlayerMovement);
     }
 
     void setParent(GameObject parent, GameObject child, RectTransform rectTr){
