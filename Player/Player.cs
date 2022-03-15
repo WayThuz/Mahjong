@@ -16,6 +16,7 @@ public class Player : MonoBehaviour
     private PlayerDeckUI myDeckUI;
     private localPlayer localplayer;
     private cameraMove myCameraMove;
+    private PlayerName playerName;
 
     private List<Card> myDeck = new List<Card>();
     private List<Card> myDeckPlayed = new List<Card>();
@@ -53,12 +54,13 @@ public class Player : MonoBehaviour
     void OnEnable(){
         myDeckUI = transform.Find("PlayerDeck").GetComponent<PlayerDeckUI>();
         myCameraMove = GameObject.Find("CameraController").GetComponent<cameraMove>();
+        playerName = this.transform.Find("PlayerName").GetComponent<PlayerName>();
         StartCoroutine(localPlayerScriptCheck());   
     }
 
     IEnumerator localPlayerScriptCheck(){
         localplayer = GameObject.Find("localPlayer").GetComponent<localPlayer>();
-        yield return new WaitForSeconds(0.2f);
+        yield return new WaitForSeconds(0.3f);
 
         if(!isThisPlayerScriptBelongsToLocalPlayer){
             this.enabled = false;
@@ -66,6 +68,7 @@ public class Player : MonoBehaviour
         else{
             isAllComponentSet = true;
             myCameraMove.setPlayerPositionToCamera(this.transform);
+            playerName.SetLocalPlayerName(localplayer.GetLocalPlayerName, myOrder);
         }
     }
 
@@ -77,17 +80,18 @@ public class Player : MonoBehaviour
 
     void LateUpdate(){ 
         if(isAllComponentSet){
-            if(MahjongSys.current.SystemAllPrepared(ref isGameStart)) gameStart();
+            if(MahjongSys.current.SystemAllPrepared(ref isGameStart)) StartCoroutine(gameStart(myOrder));
             if(MahjongSys.current.IsCardGiver(myOrder)) turn_CardGiver();
             else if(MahjongSys.current.IsCardAwaiter(myOrder)) turn_CardAwaiter();             
         }
     }
 
     #region AllPlayer movement
-    void gameStart(){ 
+    IEnumerator gameStart(int playerOrder){ 
         myDeck = MahjongSys.current.DealCards(myOrder); 
-        replaceCards();
         buttonTakeRest();
+        yield return new WaitForSeconds(myOrder*0.5f);
+        replaceCards();
     }
 
     void turn_CardGiver(){
@@ -125,20 +129,39 @@ public class Player : MonoBehaviour
     }
 
     IEnumerator showMeldToBroad(Card cardGot){
-        bool isMeldAssigned = myDeckUI.isMeldAssigned;
-        if(isMeldAssigned){
+        if(myDeckUI.isMeldAssigned){
             myDeckUI.showMeldToBroad(ref myDeck, cardGot);
-            yield break;  
+            cardGot = null;
+            yield return new WaitForSeconds(0.3f);
+            yield return StartCoroutine(checkConcealedKong(cardGot));  
+            yield break;
         }
         else{
             for(int i = 0; i < 200; i++){
                 yield return new WaitForSeconds(0.1f);
-                if(isMeldAssigned){
+                if(myDeckUI.isMeldAssigned){
                     myDeckUI.showMeldToBroad(ref myDeck, cardGot);
-                    yield break;  
+                    yield return new WaitForSeconds(0.3f);
+                    yield return StartCoroutine(checkConcealedKong(cardGot)); 
+                    yield break;
                 }
             }
         }
+    }
+
+    IEnumerator checkConcealedKong(Card cardGot){
+        List<int> cardsInKong = CombinationMethod.deckHasKong(myDeck, cardGot);
+        if(cardsInKong.Count > 0){
+            myDeckUI.AssignKongs(cardsInKong);
+        }
+        for(int i = 0; i < 200; i++){
+            yield return new WaitForSeconds(0.1f);
+            if(myDeckUI.isMeldAssigned){
+                myDeckUI.showMeldToBroad(ref myDeck, cardGot);
+                yield break;
+            }
+        }
+
     }
 
     void pickAndPlayCard(){
@@ -252,11 +275,11 @@ public class Player : MonoBehaviour
             Card cardReplaced = null;
             if(i < myDeck.Count && myDeck[i].Order >= flowerOrder){
                 cardReplaced = myDeck[i];
-                myDeck[i] = MahjongSys.current.DrawCardInDeck;
+                myDeck[i] = MahjongSys.current.DrawCardInDeck();
             }
             else if(newCardAwait != null && newCardAwait.Order >= flowerOrder){
                 cardReplaced = newCardAwait;
-                newCardAwait = MahjongSys.current.DrawCardInDeck;
+                newCardAwait = MahjongSys.current.DrawCardInDeck();
             }           
             if(cardReplaced == null) continue;
             myDeckPlayed.Add(cardReplaced);
@@ -308,11 +331,11 @@ public class Player : MonoBehaviour
     
     IEnumerator decidedMovement(int eat, int pon, int kong, int win){
         isMovementChecked = true;
-        movementButtonSetActive(eat, pon, kong, win);      
         if(eat + pon + kong + win == 0){
             passThisTurn();
             yield break;
         }  
+        movementButtonSetActive(eat, pon, kong, win);      
         for(int i = 0; i < 200; i++){
             yield return new WaitForSeconds(0.1f);//count
             if(nextMovement != initialStatus) yield break;    
@@ -334,7 +357,7 @@ public class Player : MonoBehaviour
     
     void passThisTurn(){
         nextMovement = -100; // if no decided;
-        MahjongSys.current.setPlayerMovement(myOrder, nextMovement);
+        MahjongSys.current.setPlayerMovement(myOrder, -100, false);
     }
 
     //0 for eat, 1 for pun, 2 for win, -100 for stop 
@@ -344,11 +367,11 @@ public class Player : MonoBehaviour
             decidedMovementCoroutine = null;
         }  
         nextMovement = movement;
-        MahjongSys.current.setPlayerMovement(myOrder, nextMovement);
+        MahjongSys.current.setPlayerMovement(myOrder, nextMovement, false);
         nextMovement = stoppedStatus;    
         if(movement == 0 || movement == 1 || movement == 3){
             displayMeld(movement);        
-            StartCoroutine(meldHintLifeTimeCountdown(movement)); 
+            if(movement == 1) StartCoroutine(meldHintLifeTimeCountdown(movement)); 
         }
         else if(MahjongSys.current.IsCardGiver(myOrder) && movement == 2) MahjongSys.current.PlayerWins(myOrder);//自摸
 
@@ -357,17 +380,18 @@ public class Player : MonoBehaviour
 
     void displayMeld(int movement){ 
         Card currentCardPlayed = MahjongSys.current.CurrentCardPlayed; 
-        if(currentCardPlayed != null) myDeckUI.AssignMeld(movement, myDeck, currentCardPlayed.Order);   
-        else if(movement == 3){
-            List<int> cardsInKong = CombinationMethod.deckHasKong(myDeck, newCardAwait);
-            myDeckUI.AssignMultipleKongs(myDeck, cardsInKong);
-        } 
+        if(currentCardPlayed != null){
+            myDeckUI.AssignMeld(movement, myDeck, currentCardPlayed.Order);   
+        }
     }
 
     IEnumerator meldHintLifeTimeCountdown(int movement){
         for(int i = 0; i < 100; i++){
             yield return new WaitForSeconds(0.05f);
-            if(MahjongSys.current.HasMovementPriorThanMine(myOrder, movement)) myDeckUI.DestroyAllHints();
+            if(MahjongSys.current.HasMovementPriorThanMine(myOrder, movement)){
+                myDeckUI.DestroyAllHints();
+                yield break;
+            }
         }
         myDeckUI.DestroyAllHints();
     } 
@@ -386,8 +410,9 @@ public class Player : MonoBehaviour
             if(SequenceOrTriplet[1]) tableOfMelds[1] = true;          
         }
         List<int> cardsInKong = CombinationMethod.deckHasKong(myDeck, card);
-        if(cardsInKong.Contains(card.Order) && !MahjongSys.current.IsCardGiver(myOrder - 1)) tableOfMelds[2] = true;//明槓
-        else if(cardsInKong.Count > 0 && MahjongSys.current.IsCardGiver(myOrder)) tableOfMelds[2] = true;//暗槓
+        if(cardsInKong.Contains(card.Order) && !MahjongSys.current.IsCardGiver(myOrder - 1)){
+            tableOfMelds[2] = true;//明槓, cannot do this if cardGiver is your previous player
+        }
         return tableOfMelds;
     }
 

@@ -47,10 +47,11 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
 
     public void changeCardAwaitStatus(bool status){
         cardAwaitModel.SetActive(status);
-        cardAwaitSprite.enabled = status;
+        cardAwaitSprite.gameObject.SetActive(status);
     }
 
     public void showMeldToBroad(ref List<Card> deck, Card cardGot){
+        Debug.Log("show meld to broad: " + isMeldAssigned.ToString()) ;
         bool isSequence = (meld[0] != meld[1]);
         meldOnBroadCount++;
         if(isSequence) sequenceToBroad(deck, cardGot, meld);
@@ -72,7 +73,7 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
                 break;
             }
         }
-        photonview.RPC("putCardToBroad", RpcTarget.AllBuffered, cardOrderInMeld);
+        photonview.RPC("visualizedCardToBroad", RpcTarget.AllBuffered, cardOrderInMeld);
     }
 
     void kongOrTripletToBroad(List<Card> deck, Card cardGot, int[] currentMeld){
@@ -94,8 +95,9 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
         photonview.RPC("visualizedCardToBroad", RpcTarget.AllBuffered, cardOrderInMeld);
     }
 
+    [PunRPC]
     void visualizedCardToBroad(int[] cardOrderInMeld){
-        GameObject meldGameObject = MahjongTable.current.setMeldGameObject(meldParent, meldPosition, meld.Length, meldOnBroadCount);
+        GameObject meldGameObject = MahjongTable.current.setMeldGameObject(meldParent, meldPosition, cardOrderInMeld.Length, meldOnBroadCount);
         for(int i  = 0; i < cardOrderInMeld.Length; i++){
             Image cardSpriteInMeld = meldGameObject.transform.GetChild(i).GetComponent<Image>();
             getCardImage(cardSpriteInMeld, cardOrderInMeld[i].ToString());
@@ -151,20 +153,21 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
     }
 
     public void AssignMeld(int movement, List<Card> deck, int cardAwaitOrder){
-        if (movement == 0){
+        if(movement == 0){
             DisplayAndCreateSequenceHints(deck, cardAwaitOrder);
         }
-        else if (movement == 1){
+        else if(movement == 1){
             meld = new int[3] { cardAwaitOrder, cardAwaitOrder, cardAwaitOrder };
         }
-        else if (movement == 3){
+        else if(movement == 3){
             meld = new int[4] { cardAwaitOrder, cardAwaitOrder, cardAwaitOrder, cardAwaitOrder };//not cardAwaitOrder
         }
         else meld = null;
     }
-
-    public void AssignMultipleKongs(List<Card> deck, List<int> cardsCanBeKong){
-        DisplayAndCreateKongHints(cardsCanBeKong);
+    
+    public void AssignKongs(List<int> cardsCanBeKong){
+        if(cardsCanBeKong.Count == 1) AssignMeld(3, null, cardsCanBeKong[0]);
+        else DisplayAndCreateKongHints(cardsCanBeKong);
     }
 
     void DisplayAndCreateSequenceHints(List<Card> deck, int cardAwaitOrder){

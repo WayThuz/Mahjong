@@ -226,16 +226,20 @@ namespace CombinationNamespace
 
         public static List<int> deckHasKong(List<Card> deck, Card card){
             List<int> cardsInKong = new List<int>();
-            for(int i = 0; i < deck.Count-2; i++){     
-                if(deck[i].Order != deck[i+1].Order || deck[i].Order != deck[i+2].Order) continue;
-                if(i+3 == deck.Count){
-                    if(deck[i].Order != card.Order) continue;
+            for(int i = 0; i < deck.Count; i++){
+                int order = deck[i].Order;
+                if(cardsInKong.Contains(order)) continue;
+                int count = 1;
+                for(int j = 0; j < deck.Count; j++){
+                    if(j == i || cardsInKong.Contains(deck[j].Order)) continue;
+                    if(deck[j].Order == order){
+                        count++;
+                    }
                 }
-                else{
-                   if(deck[i].Order != deck[i+3].Order && deck[i].Order != card.Order) continue;
-                }
-                cardsInKong.Add(deck[i].Order);
+                if(card != null && card.Order == order) count++;
+                if(count == 4) cardsInKong.Add(order);
             }
+            
             return cardsInKong;
         }
 
