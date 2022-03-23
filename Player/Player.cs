@@ -373,7 +373,10 @@ public class Player : MonoBehaviour
             displayMeld(movement);        
             if(movement == 1) StartCoroutine(meldHintLifeTimeCountdown(movement)); 
         }
-        else if(MahjongSys.current.IsCardGiver(myOrder) && movement == 2) MahjongSys.current.PlayerWins(myOrder);//自摸
+        else if(movement == 2){
+            MahjongSys.current.storeWinningDeck(myDeck, myDeckUI.MeldOnBroad, myDeckUI.MeldOnBroadCount);
+            if(MahjongSys.current.IsCardGiver(myOrder)) MahjongSys.current.PlayerWins(myOrder);//自摸
+        }
 
         buttonTakeRest();
     }    

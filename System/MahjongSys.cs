@@ -311,7 +311,24 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     #endregion
 
     #region Others
+    public void storeWinningDeck(List<Card> deck, List<int[]> melds, int meldCount){
+        PlayerPrefs.SetInt("winnerDeckCount", deck.Count);
+        PlayerPrefs.SetInt("winnerMeldsCount", meldCount);
+        for(int i = 0; i < deck.Count; i++){
+            PlayerPrefs.SetString("winnerDeck_" + i, deck[i].Order.ToString());
+        }
 
+        if(melds.Count != meldCount){
+            Debug.LogWarning("melds.Count does not equals to the variable meldCount");
+        }
+
+        for(int i = 0; i < meldCount; i++){
+            PlayerPrefs.SetInt("winnerMeldsCount_" + i, i);
+            for(int j = 0; j < melds[i].Length; j++){
+                PlayerPrefs.SetString("winnerMelds_" + i + "_" + j, melds[i][j].ToString());
+            }
+        }
+    }
     #endregion
 #endregion
 
@@ -349,11 +366,6 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     void receivedPlayerSetMovement(int playerOrder, int nextMovement, bool isReset){
         if(isReset && nextMovement == -1) playerMovement[playerOrder] = nextMovement;
         else if(!isReset && nextMovement != -1) playerMovement[playerOrder] = nextMovement;
-        if(PhotonNetwork.IsMasterClient){
-            for(int i = 0; i < numberOfPlayers; i++){
-                Debug.Log("masterPlayer received movement change by player: " + playerOrder.ToString() + " with movement " + nextMovement.ToString() + " with isReset: " + isReset.ToString());
-            }
-        }
     }
 
     public bool HasMovementPriorThanMine(int playerOrder, int movement){
@@ -419,9 +431,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
 
     [PunRPC]
     void receivedDrawCard(int name){
-        string message = " call by player " + name.ToString();
         if(PhotonNetwork.IsMasterClient){
-            Debug.Log("currentCardIndex: " + nextCardIndexBeingDrew.ToString() +" change to: " + (nextCardIndexBeingDrew + 1).ToString() + message);
             nextCardIndexBeingDrew++;
             photonview.RPC("setNextCardBeingDrew", RpcTarget.OthersBuffered, nextCardIndexBeingDrew);
         }

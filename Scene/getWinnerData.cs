@@ -7,7 +7,7 @@ using UnityEngine.SceneManagement;
 using Photon.Pun;
 using Photon.Realtime;
 
-public class getWinnerData : MonoBehaviour
+public class getWinnerData : MonoBehaviourPunCallbacks
 {   [SerializeField] private PhotonView photonview;
     [SerializeField] private localPlayer myLocalPlayer;
     [SerializeField] private Text winnerMassage;
@@ -21,6 +21,7 @@ public class getWinnerData : MonoBehaviour
         int winnerOrder = PlayerPrefs.GetInt("winnerPlayerIndex");
         if(myLocalPlayer.GetLocalPlayerOrder == winnerOrder){
             string winnerName = myLocalPlayer.GetLocalPlayerName;
+            winnerUI.current.setWinnerUI(); 
             photonview.RPC("showWinner", RpcTarget.AllBuffered, winnerName);
         }
     }   

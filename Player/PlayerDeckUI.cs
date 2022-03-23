@@ -21,9 +21,9 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
     [SerializeField] private Vector3 meldPosition = new Vector3(-240, -100, 50);
     [SerializeField] private Vector2 sizeDelta;
 
-    private int meldOnBroadCount = 0;
     private GameObject canvas;
-    List<meldHint> allMeldHints = new List<meldHint>();
+    private List<meldHint> allMeldHints = new List<meldHint>();
+    private List<int[]> meldOnBroad = new List<int[]>();
 
     private int[] meld = null;
     private bool lock_DestroyAllHint = false;
@@ -53,7 +53,7 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
     public void showMeldToBroad(ref List<Card> deck, Card cardGot){
         Debug.Log("show meld to broad: " + isMeldAssigned.ToString()) ;
         bool isSequence = (meld[0] != meld[1]);
-        meldOnBroadCount++;
+        meldOnBroad.Add(meld);
         if(isSequence) sequenceToBroad(deck, cardGot, meld);
         else kongOrTripletToBroad(deck, cardGot, meld);
         rearrangeDeckspriteName();
@@ -97,7 +97,7 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
 
     [PunRPC]
     void visualizedCardToBroad(int[] cardOrderInMeld){
-        GameObject meldGameObject = MahjongTable.current.setMeldGameObject(meldParent, meldPosition, cardOrderInMeld.Length, meldOnBroadCount);
+        GameObject meldGameObject = MahjongTable.current.setMeldGameObject(meldParent, meldPosition, cardOrderInMeld.Length, MeldOnBroadCount);
         for(int i  = 0; i < cardOrderInMeld.Length; i++){
             Image cardSpriteInMeld = meldGameObject.transform.GetChild(i).GetComponent<Image>();
             getCardImage(cardSpriteInMeld, cardOrderInMeld[i].ToString());
@@ -229,9 +229,15 @@ public class PlayerDeckUI : MonoBehaviourPunCallbacks{
         }
     }
 
+    public List<int[]> MeldOnBroad{
+        get{
+            return meldOnBroad;
+        }
+    }
+
     public int MeldOnBroadCount{
         get{
-            return meldOnBroadCount;
+            return meldOnBroad.Count;
         }
     }
 
