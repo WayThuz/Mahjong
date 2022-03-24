@@ -9,12 +9,14 @@ using Photon.Pun;
 using Photon.Realtime;
 
 using CombinationNamespace;
+using CardDealer;
+using Judge;
 
 public class MahjongSys : MonoBehaviourPunCallbacks{
     public static MahjongSys current;
     private PhotonView photonview;
     [SerializeField] private GameObject[] playerObjs = new GameObject[4];
-    private Card currentCardPlayed = null;
+    public Card CurrentCardPlayed{ get; private set; }
     private Card cardGot = null;
     private List<Card> shuffledDeck = new List<Card>();
     private IEnumerator decidedNextPlayerCoroutine;
@@ -24,8 +26,6 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     private int currentTurnGiverIndex = -1;
 
     const int numberOfPlayers = 4;
-    const int number_TotalDeals = 4;
-    const int cards_EachDeal = 4;
 
     //-1 for initial, 0 for eat, 1 for pon, 2 for win  -100 for stopping
     private int[] playerMovement = new int[numberOfPlayers] { -1, -1, -1, -1 };
@@ -57,69 +57,19 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     
     #region Initialized
     void InitializeCenterDeck(){
-        Card[] initialDeck = GenerateDeck();
-        StartCoroutine(shuffledCards(initialDeck, () => SystemActivated()));
-    }
-    
-    Card[] GenerateDeck(){
-        Card[] deck = new Card[144];
-        for (int j = 0; j < 5; j++){
-            int cardAmounts; int orderStarting; int circleInType;
-            switch (j){
-                case 0://字 
-                    cardAmounts = 28; orderStarting = 108; circleInType = 7;
-                    break;
-                case 4://花
-                    cardAmounts = 8; orderStarting = 136; circleInType = 100;//big enough to prevent from repeated;
-                    break;
-
-                default://條筒萬
-                    cardAmounts = 36; orderStarting = 36 * (j - 1); circleInType = 9;
-                    break;
-            }
-            for (int i = 0; i < cardAmounts; i++){
-                Card newCard = new Card(j, i % circleInType + 1);
-                deck[i + orderStarting] = newCard;
-            }
-        }
-        return deck;
+        Card[] initialDeck = Dealer.generateDeck();
+        StartCoroutine(shuffleCenterDeck(initialDeck, () => SystemActivated()));
     }
 
-    IEnumerator shuffledCards(Card[] initialDeck, Action method){
-        FirstShuffle(initialDeck);
+    IEnumerator shuffleCenterDeck(Card[] initialDeck, Action method){
+        shuffledDeck = Dealer.shuffle(initialDeck);
         yield return new WaitForSeconds(0.5f);
-        NextShuffle();
+        shuffledDeck = Dealer.shuffle(shuffledDeck.ToArray());
         yield return new WaitForSeconds(0.5f);
-        NextShuffle();
+        shuffledDeck = Dealer.shuffle(shuffledDeck.ToArray());
         yield return new WaitForSeconds(0.5f);
         isShuffled = true;
         method();
-    }
-
-    void FirstShuffle(Card[] deck){
-        List<int> assignList = new List<int>();
-        for (int i = 0; i < 144; i++){
-            assignList.Add(i);
-        }
-        for (int i = 0; i < 144; i++){
-            int randomIndex = UnityEngine.Random.Range(0, assignList.Count);
-            shuffledDeck.Add(deck[assignList[randomIndex]]);
-            assignList.RemoveAt(randomIndex);
-        }
-    }
-
-    void NextShuffle(){
-        List<int> assignList = new List<int>();
-        List<Card> newShuffledDeck = new List<Card>();
-        for (int i = 0; i < 144; i++){
-            assignList.Add(i);
-        }
-        for (int i = 0; i < 144; i++){
-            int randomIndex = UnityEngine.Random.Range(0, assignList.Count);
-            newShuffledDeck.Add(shuffledDeck[assignList[randomIndex]]);
-            assignList.RemoveAt(randomIndex);
-        }
-        shuffledDeck = newShuffledDeck;
     }
     #endregion
 
@@ -131,23 +81,15 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         }
     }
     void assignShuffleDeckToOtherClient(){   
-        int[] types = new int[144];
-        int[] numbers = new int[144];
-        for(int i = 0; i < 144; i++){
-            types[i] = shuffledDeck[i].Type;
-            numbers[i] = shuffledDeck[i].Number;
-        }
+        int[] types = Dealer.type_Cards(shuffledDeck);
+        int[] numbers = Dealer.ID_Cards(shuffledDeck);
         photonview.RPC("assignDeck", RpcTarget.OthersBuffered, types, numbers);
     }
 
     [PunRPC]
     void assignDeck(int[] types, int[] numbers){
         if(!isShuffled){
-            this.shuffledDeck = new List<Card>();
-            for (int i = 0; i < 144; i++){
-                Card card = new Card(types[i], numbers[i]);
-                shuffledDeck.Add(card);
-            }
+            this.shuffledDeck = Dealer.assignDeck(types, numbers);       
             isShuffled = true;
         }
     }
@@ -167,12 +109,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
 
     [PunRPC]
     void synchronizeVariables(int cardPlayedType, int cardPlayedNumber){
-        setCurrentCardPlayed(cardPlayedType, cardPlayedNumber);
-    }
-
-    void setCurrentCardPlayed(int cardPlayedType, int cardPlayedNumber) {
-        Card cardPlayed = new Card(cardPlayedType, cardPlayedNumber);
-        CurrentCardPlayed = cardPlayed;
+        CurrentCardPlayed = new Card(cardPlayedType, cardPlayedNumber);
     }
 
     [PunRPC]
@@ -184,7 +121,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
     IEnumerator decidedNextPlayer(int previousPlayer){  
         for (int i = 0; i < 20; i++){
             yield return new WaitForSeconds(1f);
-            if (allFinished()){
+            if(PlayerDecider.allFinished(playerMovement, turnFinishedCheck)){
                 nextPlayerAction(previousPlayer);
                 yield break;
             }
@@ -192,66 +129,11 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         nextPlayerAction(previousPlayer);
     }
 
-    bool allFinished(){
-        bool isMoved = true;
-        foreach (int movement in playerMovement){
-            if (movement == -1){
-                isMoved = false;
-                Debug.Log("isMoved = false");
-            }
-        }
-        return (isMoved && turnFinishedCheck[0] && turnFinishedCheck[1] && turnFinishedCheck[2] && turnFinishedCheck[3]);
-    }
-
     void nextPlayerAction(int previousPlayer){
         bool isWinner = false;
-        int nextPlayer = getPlayerByCheckMovement(previousPlayer, out isWinner);
+        int nextPlayer = PlayerDecider.getPlayerByCheckMovement(playerMovement, previousPlayer, out isWinner);
         if(isWinner) PlayerWins(nextPlayer);
         else StartCoroutine(turnPreparation(nextPlayer));
-    }
-
-
-    int getPlayerByCheckMovement(int previousPlayer, out bool isWinner){
-        int winnerPlayer = getWinner(previousPlayer);
-        if(winnerPlayer != -1){
-            isWinner = true;
-            return winnerPlayer;
-        }
-        else{
-            int nextPlayer = getNextPlayer(previousPlayer);
-            isWinner = false;
-            return nextPlayer;
-        }
-    }
-
-    int getWinner(int previousPlayer){
-        int winnerPlayer = -1;
-        for(int i  = 0; i < 4; i++){
-            int playerOrder = (previousPlayer + i)%4;
-            if(playerMovement[playerOrder] == 2){
-                winnerPlayer = playerOrder;
-                return winnerPlayer;
-            }
-        }
-        return winnerPlayer;
-    }
-
-    int getNextPlayer(int previousPlayer){
-        int nextPlayer = previousPlayer;
-        for (int playerCompared = 0; playerCompared < playerMovement.Length; playerCompared++){
-            nextPlayer = comparePlayersIndex(nextPlayer, playerCompared, previousPlayer);
-        }
-        if (playerMovement[nextPlayer] < 0) nextPlayer = (previousPlayer + 1) % numberOfPlayers;
-        return nextPlayer;
-    }
-
-    int comparePlayersIndex(int playerIndex, int playerCompared, int previousPlayer){
-        if (playerMovement[playerIndex] == playerMovement[playerCompared]){
-            if (playerCompared - previousPlayer > 0 && previousPlayer - playerIndex > 0) return playerCompared;
-            else if (playerCompared < playerIndex) return playerCompared;
-        }
-        else if (playerMovement[playerCompared] > playerMovement[playerIndex]) return playerCompared;
-        return playerIndex;
     }
 
     public void PlayerWins(int winnerOrder){
@@ -284,7 +166,6 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
 
     void setCardGot(bool isAllPlayerPass){   
         if(isAllPlayerPass){
-            Debug.Log("CardGot = " + nextCardIndexBeingDrew.ToString());
             cardGot = shuffledDeck[nextCardIndexBeingDrew];
             nextCardIndexBeingDrew++;
             isCardGotInDeck = true;
@@ -294,8 +175,6 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
             isCardGotInDeck = false;
         }
     }
-
-    
 
     void resetMovement(bool isMasterClient){
         for (int i = 0; i < numberOfPlayers; i++){
@@ -334,15 +213,7 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
 
 #region MethodPlayerWouldCall
     public List<Card> DealCards(int playerOrder){
-        List<Card> myDeck = new List<Card>();
-        for (int i = 0; i < number_TotalDeals; i++){
-            int cardOnTop = playerOrder * cards_EachDeal + i * 16;
-            myDeck.Add(shuffledDeck[cardOnTop]);
-            myDeck.Add(shuffledDeck[cardOnTop + 1]);
-            myDeck.Add(shuffledDeck[cardOnTop + 2]);
-            myDeck.Add(shuffledDeck[cardOnTop + 3]);
-        }
-        return myDeck;
+        return Dealer.dealCards(playerOrder, shuffledDeck);
     }
 
     #region PlayerFinishTurn
@@ -368,49 +239,31 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         else if(!isReset && nextMovement != -1) playerMovement[playerOrder] = nextMovement;
     }
 
-    public bool HasMovementPriorThanMine(int playerOrder, int movement){
-        if(movement == -100){
-            throw new ArgumentException("movement = -100, which is the value should not call this function");
-        }
-        for(int i = 0; i < playerMovement.Length; i++){
-            if(i == playerOrder) continue;
-            if(playerMovement[i] > movement || playerMovement[i] == 2){
-                return true;
-            }
-        }
-        return false;
+    public bool HasMovementPriorThanMine(int myOrder, int myMovement){
+        return PlayerDecider.hasPlayerPrior(playerMovement, myOrder, myMovement);
     }
 
     public bool WinningCheck(int playerOrder, List<Combination> combinationList, int meldOnBroadCount, out int numberOfWinningCombination){
-        numberOfWinningCombination = 0;
-        bool winningCheck = false;
-        foreach (Combination combination in combinationList){
-            if (combination.meldsInDeck[0] + meldOnBroadCount == 5 && combination.meldsInDeck[1] == 1){
-                winningCheck = true;
-                numberOfWinningCombination++;
-            }
-        }
-        return winningCheck;
+        return PlayerDecider.isWin(playerOrder, combinationList, meldOnBroadCount, out numberOfWinningCombination);
     }
 
     public bool IsCardGiver(int playerIndex){
-        return ((playerIndex + 4) % 4 == currentTurnGiverIndex);
+        return PlayerIdentifier.isCardGiver(playerIndex, currentTurnGiverIndex);
     }
 
     public bool IsCardAwaiter(int playerIndex){
-        return (playerIndex != currentTurnGiverIndex);
+        return PlayerIdentifier.isCardAwaiter(playerIndex, currentTurnGiverIndex);
     }
 
     public bool playerCanEat(bool deckCanEat, int playerOrder){
-        return (deckCanEat && (playerOrder == (currentTurnGiverIndex + 1) % numberOfPlayers));
+        return PlayerIdentifier.canEat(deckCanEat, playerOrder, currentTurnGiverIndex);
     }
 
     public bool playerCanPon(bool deckCanPon, int playerOrder){
-        return (deckCanPon && (playerOrder != currentTurnGiverIndex));
+        return PlayerIdentifier.canEat(deckCanPon, playerOrder, currentTurnGiverIndex);
     }
 
-    public bool SystemAllPrepared(ref bool isGameStart)
-    {
+    public bool SystemAllPrepared(ref bool isGameStart){
         if(!isGameStart && isShuffled){
             isGameStart = true;
             return true;
@@ -442,16 +295,5 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         nextCardIndexBeingDrew = newIndex;
     }
 
-    public Card CurrentCardPlayed{
-        get{
-            return currentCardPlayed;
-        }
-        private set{
-            currentCardPlayed = value;
-        }
-    }
-
 #endregion
-
-    
 }
