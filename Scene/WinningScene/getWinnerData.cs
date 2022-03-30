@@ -10,11 +10,11 @@ using Photon.Realtime;
 public class getWinnerData : MonoBehaviourPunCallbacks
 {   [SerializeField] private PhotonView photonview;
     [SerializeField] private localPlayer myLocalPlayer;
-    [SerializeField] private Text winnerMassage;
+    [SerializeField] private Text winnerMessage;
     void Awake(){
         if(photonview == null) photonview = GetComponent<PhotonView>();
         if(myLocalPlayer == null) myLocalPlayer = GameObject.Find("localPlayer").GetComponent<localPlayer>();
-        if(winnerMassage == null) winnerMassage = GameObject.Find("Canvas").GetComponent<Text>();
+        if(winnerMessage == null) winnerMessage = GameObject.Find("WinnerMessage").GetComponent<Text>();
     }
 
     void Start(){
@@ -28,7 +28,7 @@ public class getWinnerData : MonoBehaviourPunCallbacks
     
     [PunRPC]
     void showWinner(string winnerName){
-        winnerMassage.text = winnerName + " wins !!!";
+        winnerMessage.text = winnerName + " wins !!!";
     }
 
     public void LeaveRoom(){

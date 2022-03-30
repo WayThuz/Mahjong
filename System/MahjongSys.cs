@@ -38,6 +38,25 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         photonview = GetComponent<PhotonView>();
     }
 
+    void Update(){
+        if(nextCardIndexBeingDrew >= 128){
+            if(PhotonNetwork.IsMasterClient){             
+                restartScene();
+            }
+        }
+    }
+
+    void restartScene(){
+        string restartMessage = "流局";
+        PlayerPrefs.SetString("restartMessage", restartMessage);
+        photonview.RPC("loadRestartScene", RpcTarget.AllBuffered);        
+    }
+
+    [PunRPC]
+    void loadRestartScene(){
+        SceneManager.LoadScene("RestartScene");
+    }
+
     public void OnPlayerAllPrepared(){
         PlayerAwake();
         InitializeCenterDeck();
@@ -243,24 +262,46 @@ public class MahjongSys : MonoBehaviourPunCallbacks{
         return PlayerDecider.hasPlayerPrior(playerMovement, myOrder, myMovement);
     }
 
-    public bool WinningCheck(int playerOrder, List<Combination> combinationList, int meldOnBroadCount, out int numberOfWinningCombination){
-        return PlayerDecider.isWin(playerOrder, combinationList, meldOnBroadCount, out numberOfWinningCombination);
+    public bool IsCardGiver(int playerOrder){
+        return PlayerIdentifier.isCardGiver(playerOrder, currentTurnGiverIndex);
     }
 
-    public bool IsCardGiver(int playerIndex){
-        return PlayerIdentifier.isCardGiver(playerIndex, currentTurnGiverIndex);
+    public bool IsCardAwaiter(int playerOrder){
+        return PlayerIdentifier.isCardAwaiter(playerOrder, currentTurnGiverIndex);
     }
 
-    public bool IsCardAwaiter(int playerIndex){
-        return PlayerIdentifier.isCardAwaiter(playerIndex, currentTurnGiverIndex);
+    public bool[] playerCanDoMovement(int playerOrder, List<Card> deck, Card card, int meldCount){
+        bool[] enabledMovement = new bool[4]{false, false, false, false};
+        List<Combination> combine = CombinationMethod.CombinationCalculator(deck, card);
+        int eat = 0; int pon = 1; int win = 2; int kong = 3;
+        if(playerCanEat(playerOrder, combine, card)) enabledMovement[eat] = true;
+        if(playerCanPon(playerOrder, combine, card)) enabledMovement[pon] = true;
+        if(playerCanWin(playerOrder, combine, meldCount)) enabledMovement[win] = true;
+        if(playerCanKong(playerOrder, deck, card)) enabledMovement[kong] = true; 
+        return enabledMovement;
     }
 
-    public bool playerCanEat(bool deckCanEat, int playerOrder){
-        return PlayerIdentifier.canEat(deckCanEat, playerOrder, currentTurnGiverIndex);
+    bool playerCanEat(int playerOrder, List<Combination> combine, Card card){
+        if(IsCardGiver(playerOrder)) return false;
+        return DeckIdentifier.canEat(playerOrder, currentTurnGiverIndex, combine, card);
     }
 
-    public bool playerCanPon(bool deckCanPon, int playerOrder){
-        return PlayerIdentifier.canEat(deckCanPon, playerOrder, currentTurnGiverIndex);
+    bool playerCanPon(int playerOrder, List<Combination> combine, Card card){
+        if(IsCardGiver(playerOrder)) return false;
+        return DeckIdentifier.canPon(playerOrder, currentTurnGiverIndex, combine, card);
+    }
+
+    bool playerCanKong(int playerOrder, List<Card> deck, Card card){
+        List<int> cardsInKong = CombinationMethod.deckHasKong(deck, card);
+         if(cardsInKong.Contains(card.Order) && IsCardGiver(playerOrder - 1)){
+            return true;//明槓, cannot do this if cardGiver is your previous player
+        }
+        return false;
+    }
+
+    bool playerCanWin(int playerOrder, List<Combination> combine, int meldOnBroadCount){
+        int numberOfWinningCombination = 0;
+        return DeckIdentifier.canWin(playerOrder, combine, meldOnBroadCount, out numberOfWinningCombination);
     }
 
     public bool SystemAllPrepared(ref bool isGameStart){

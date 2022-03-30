@@ -9,6 +9,8 @@ namespace Judge
 {
     public class PlayerDecider{
         const int numberOfPlayers = 4;
+        const int win = 2;
+        const int stop = -100;
 
         public static int getPlayerByCheckMovement(int[] playerMovement, int previousPlayer, out bool isWinner){
             int winnerPlayer = getWinner(playerMovement, previousPlayer);
@@ -25,9 +27,9 @@ namespace Judge
 
         static int getWinner(int[] playerMovement, int previousPlayer){
             int winnerPlayer = -1;
-            for(int i  = 0; i < 4; i++){
-                int playerOrder = (previousPlayer + i)%4;
-                if(playerMovement[playerOrder] == 2){
+            for(int i  = 0; i < numberOfPlayers; i++){
+                int playerOrder = (previousPlayer + i)%numberOfPlayers;
+                if(playerMovement[playerOrder] == win){
                     winnerPlayer = playerOrder;
                     return winnerPlayer;
                 }
@@ -54,12 +56,12 @@ namespace Judge
         }
 
         public static bool hasPlayerPrior(int[] playerMovement, int playerOrder, int movement){
-            if(movement == -100){
+            if(movement == stop){
                 throw new ArgumentException("movement = -100, which is the value should not call this function");
             }
             for(int i = 0; i < playerMovement.Length; i++){
                 if(i == playerOrder) continue;
-                if(playerMovement[i] > movement || playerMovement[i] == 2){
+                if(playerMovement[i] > movement || playerMovement[i] == win){
                     return true;
                 }
             }
@@ -72,17 +74,7 @@ namespace Judge
             return true;
         }
 
-        public static bool isWin(int playerOrder, List<Combination> combinationList, int meldOnBroadCount, out int numberOfWinningCombination){
-            numberOfWinningCombination = 0;
-            bool winningCheck = false;
-            foreach (Combination combination in combinationList){
-                if (combination.meldsInDeck[0] + meldOnBroadCount == 5 && combination.meldsInDeck[1] == 1){
-                    winningCheck = true;
-                    numberOfWinningCombination++;
-                }
-            }
-            return winningCheck;
-        }
+        
     }
 
     public class PlayerIdentifier{
@@ -95,13 +87,41 @@ namespace Judge
         public static bool isCardAwaiter(int playerIndex, int currentTurnGiverIndex){
             return (playerIndex != currentTurnGiverIndex);
         }
+    }
 
-        public static bool canEat(bool deckCanEat, int playerOrder, int currentTurnGiverIndex){
+    public class DeckIdentifier{
+        const int numberOfPlayers = 4;
+        const int eat = 0;
+        const int pon = 1;
+
+        public static bool canEat(int playerOrder, int currentTurnGiverIndex, List<Combination> combine, Card card){
+            bool deckCanEat = deckCanDoMovement(playerOrder, combine, card, eat);
             return (deckCanEat && (playerOrder == (currentTurnGiverIndex + 1) % numberOfPlayers));
         }
 
-        public static bool canPon(bool deckCanPon, int playerOrder, int currentTurnGiverIndex){
+        public static bool canPon(int playerOrder, int currentTurnGiverIndex, List<Combination> combine, Card card){
+            bool deckCanPon = deckCanDoMovement(playerOrder, combine, card, pon);
             return (deckCanPon && (playerOrder != currentTurnGiverIndex));
         }
+
+        public static bool canWin(int playerOrder, List<Combination> combine, int meldOnBroadCount, out int numberOfWinningCombine){
+            numberOfWinningCombine = 0;
+            bool winningCheck = false;
+            foreach (Combination combination in combine){
+                if (combination.meldsInDeck[0] + meldOnBroadCount == 5 && combination.meldsInDeck[1] == 1){
+                    winningCheck = true;
+                    numberOfWinningCombine++;
+                }
+            }
+            return winningCheck;
+        }
+
+        static bool deckCanDoMovement(int playerOrder, List<Combination> combine, Card card, int movement){
+            foreach(Combination combination in combine){ 
+                bool[] SequenceOrTriplet = combination.IsInSequenceOrTriplet(card);
+                if(SequenceOrTriplet[movement]) return true;    
+            } 
+            return false;
+        } 
     }
 }

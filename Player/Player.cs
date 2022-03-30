@@ -128,25 +128,16 @@ public class Player : MonoBehaviour
         resortedAndShowDeck();
     }
 
-    IEnumerator showMeldToBroad(Card cardGot){
-        if(myDeckUI.isMeldAssigned){
-            myDeckUI.showMeldToBroad(ref myDeck, cardGot);
-            cardGot = null;
-            yield return new WaitForSeconds(0.3f);
-            yield return StartCoroutine(checkConcealedKong(cardGot));  
-            yield break;
-        }
-        else{
-            for(int i = 0; i < 200; i++){
-                yield return new WaitForSeconds(0.1f);
-                if(myDeckUI.isMeldAssigned){
-                    myDeckUI.showMeldToBroad(ref myDeck, cardGot);
-                    yield return new WaitForSeconds(0.3f);
-                    yield return StartCoroutine(checkConcealedKong(cardGot)); 
-                    yield break;
-                }
+    IEnumerator showMeldToBroad(Card cardGot){      
+        for(int i = 0; i < 200; i++){
+            yield return new WaitForSeconds(0.1f);
+            if(myDeckUI.isMeldAssigned){
+                myDeckUI.showMeldToBroad(ref myDeck, cardGot);            
+                yield return new WaitForSeconds(0.15f);
+                yield return StartCoroutine(checkConcealedKong(cardGot)); 
+                yield break;
             }
-        }
+        }      
     }
 
     IEnumerator checkConcealedKong(Card cardGot){
@@ -306,36 +297,29 @@ public class Player : MonoBehaviour
 
     private int nextMovement = initialStatus;
     private bool isMovementChecked = false;
-    //0 for only eat, 1 for only pon, 2 for win 
+    const int eat = 0; const int pon = 1; const int win = 2; const int kong = 3; 
     void movementCheck(List<Card> deck, Card card){  
-        int eat, pon, kong, win; 
-        eat = pon = kong = win = 0;      
+        bool[] playerCanDoMovement = new bool[4]{false, false, false, false};  
         isMovementChecked = true;  
         if(card == null){
-            decidedMovementCoroutine = decidedMovement(eat, pon, kong, win);
+            decidedMovementCoroutine = decidedMovement(playerCanDoMovement);
             StartCoroutine(decidedMovementCoroutine);
         } 
-        else{
-            List<Combination> combine_DeckAndCard = CombinationMethod.CombinationCalculator(deck, card);
-            bool[] checkTable = IsInMelds(combine_DeckAndCard, card);  
-            if(checkTable[2]) kong = 1; 
-            if(isWin(combine_DeckAndCard)) win = 1;
-            if(!MahjongSys.current.IsCardGiver(myOrder)){
-                if(MahjongSys.current.playerCanEat(checkTable[0], myOrder)) eat = 1;
-                if(MahjongSys.current.playerCanPon(checkTable[1], myOrder)) pon = 1;
-            }
-            decidedMovementCoroutine = decidedMovement(eat, pon, kong, win);
+        else{      
+            playerCanDoMovement = MahjongSys.current.playerCanDoMovement(myOrder, deck, card, myDeckUI.MeldOnBroadCount);
+            decidedMovementCoroutine = decidedMovement(playerCanDoMovement);
             StartCoroutine(decidedMovementCoroutine);
         }      
     }
     
-    IEnumerator decidedMovement(int eat, int pon, int kong, int win){
+    IEnumerator decidedMovement(bool[] playerCanDoMovement){
         isMovementChecked = true;
-        if(eat + pon + kong + win == 0){
+
+        if(!playerCanDoMovement[eat] && !playerCanDoMovement[pon] && !playerCanDoMovement[kong] && !playerCanDoMovement[win]){
             passThisTurn();
             yield break;
         }  
-        movementButtonSetActive(eat, pon, kong, win);      
+        movementButtonSetActive(playerCanDoMovement);      
         for(int i = 0; i < 200; i++){
             yield return new WaitForSeconds(0.1f);//count
             if(nextMovement != initialStatus) yield break;    
@@ -343,15 +327,21 @@ public class Player : MonoBehaviour
         passThisTurn();
     }
     
-    void movementButtonSetActive(int eat, int pon, int kong, int win){
+    void movementButtonSetActive(bool[] playerCanDoMovement){
+        
         if(MahjongSys.current.IsCardGiver(myOrder)){
-            if(kong == 1) kongButton.SetActive(true); if(win == 1) winButton.SetActive(true);
-            if(kong + win > 0) quitMovementButton.SetActive(true);
+            if(playerCanDoMovement[kong]) kongButton.SetActive(true); 
+            if(playerCanDoMovement[win]) winButton.SetActive(true);
+            if(playerCanDoMovement[kong] || playerCanDoMovement[win]){
+                quitMovementButton.SetActive(true);
+            }
         }
         else{
-            if(eat == 1) eatButton.SetActive(true); if(pon == 1) ponButton.SetActive(true); 
-            if(win == 1) winButton.SetActive(true); if(kong == 1) kongButton.SetActive(true); 
-            if(eat + pon + kong + win > 0) quitMovementButton.SetActive(true);
+            if(playerCanDoMovement[eat]) eatButton.SetActive(true); 
+            if(playerCanDoMovement[pon]) ponButton.SetActive(true); 
+            if(playerCanDoMovement[win]) winButton.SetActive(true); 
+            if(playerCanDoMovement[kong]) kongButton.SetActive(true); 
+            quitMovementButton.SetActive(true);
         }       
     }
     
@@ -360,7 +350,6 @@ public class Player : MonoBehaviour
         MahjongSys.current.setPlayerMovement(myOrder, -100, false);
     }
 
-    //0 for eat, 1 for pun, 2 for win, -100 for stop 
     public void pushMovementButton(int movement){
         if(decidedMovementCoroutine != null){
             StopCoroutine(decidedMovementCoroutine);
@@ -369,11 +358,11 @@ public class Player : MonoBehaviour
         nextMovement = movement;
         MahjongSys.current.setPlayerMovement(myOrder, nextMovement, false);
         nextMovement = stoppedStatus;    
-        if(movement == 0 || movement == 1 || movement == 3){
+        if(movement == eat || movement == pon || movement == kong){
             displayMeld(movement);        
-            if(movement == 1) StartCoroutine(meldHintLifeTimeCountdown(movement)); 
+            if(movement == eat) StartCoroutine(meldHintLifeTimeCountdown(movement)); 
         }
-        else if(movement == 2){
+        else if(movement == win){
             MahjongSys.current.storeWinningDeck(myDeck, myDeckUI.MeldOnBroad, myDeckUI.MeldOnBroadCount);
             if(MahjongSys.current.IsCardGiver(myOrder)) MahjongSys.current.PlayerWins(myOrder);//自摸
         }
@@ -405,28 +394,6 @@ public class Player : MonoBehaviour
         quitMovementButton.SetActive(false);
     }
 
-    bool[] IsInMelds(List<Combination> combine_DeckAndCard, Card card){
-        bool[] tableOfMelds = new bool[3]{false,false,false};
-        foreach(Combination combination in combine_DeckAndCard){ 
-            bool[] SequenceOrTriplet = combination.IsInSequenceOrTriplet(card);
-            if(SequenceOrTriplet[0]) tableOfMelds[0] = true;
-            if(SequenceOrTriplet[1]) tableOfMelds[1] = true;          
-        }
-        List<int> cardsInKong = CombinationMethod.deckHasKong(myDeck, card);
-        if(cardsInKong.Contains(card.Order) && !MahjongSys.current.IsCardGiver(myOrder - 1)){
-            tableOfMelds[2] = true;//明槓, cannot do this if cardGiver is your previous player
-        }
-        return tableOfMelds;
-    }
-
-    bool isWin(List<Combination> combinations){
-        int numberOfWinningCombination = 0;
-        if(MahjongSys.current.WinningCheck(myOrder, combinations, myDeckUI.MeldOnBroadCount, out numberOfWinningCombination)){
-            Debug.Log("Player order: " + myOrder.ToString() + " wins !!! Number of winning combinations: " + numberOfWinningCombination.ToString());
-            return true;
-        }
-        return false;
-    }
 
     void resortDeckOrder(){
         List<int> orderList = new List<int>();
